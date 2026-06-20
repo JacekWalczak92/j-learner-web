@@ -1,0 +1,5 @@
+bodziec warunkowy;bodziec, który po skojarzeniu wywołuje reakcję warunkową;warunkowanie
+walidacja;stopień, w jakim test mierzy to, co ma mierzyć;psychometria
+rzetelność;spójność i powtarzalność pomiaru;psychometria
+hipoteza zerowa;założenie o braku efektu lub różnicy;statystyka
+zmienna niezależna;zmienna manipulowana przez badacza;metodologia

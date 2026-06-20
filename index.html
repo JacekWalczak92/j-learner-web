@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co; base-uri 'self'; object-src 'none'; form-action 'self'"
+  />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#16181d" />
+  <title>J-Learner</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">JL</span>
+      <div class="brand-text">
+        <span class="brand-name">J-Learner</span>
+        <span class="brand-sub">Fiszki &amp; testy ABCD</span>
+      </div>
+    </div>
+    <div id="user-box" class="user-box hidden">
+      <span id="user-email" class="user-email"></span>
+      <button id="btn-logout" class="btn btn-ghost btn-sm" type="button">Wyloguj</button>
+    </div>
+  </header>
+
+  <main id="main" class="main">
+
+    <!-- ───────────────────────── LOGOWANIE ───────────────────────── -->
+    <section id="screen-auth" class="screen is-active">
+      <div class="lead">
+        <h1 class="lead-title">Zaloguj się</h1>
+        <p class="lead-text">Zapisuj swoje fiszki i testy w folderach i korzystaj z materiałów od autora.</p>
+      </div>
+      <div class="auth-card">
+        <label class="field"><span>E-mail</span>
+          <input id="auth-email" class="text-input" type="email" autocomplete="email" placeholder="ty@example.com" />
+        </label>
+        <label class="field"><span>Hasło</span>
+          <input id="auth-pass" class="text-input" type="password" autocomplete="current-password" placeholder="min. 6 znaków" />
+        </label>
+        <div class="auth-actions">
+          <button id="btn-signin" class="btn btn-primary" type="button">Zaloguj</button>
+          <button id="btn-signup" class="btn btn-secondary" type="button">Załóż konto</button>
+        </div>
+        <p id="auth-status" class="status" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── BIBLIOTEKA ───────────────────────── -->
+    <section id="screen-library" class="screen">
+      <div class="sources" role="tablist" aria-label="Widok">
+        <button class="source-tab is-active" role="tab" data-tab="mine">Moje materiały</button>
+        <button class="source-tab" role="tab" data-tab="public">Od autora</button>
+      </div>
+
+      <div id="tab-mine">
+        <div class="lib-bar">
+          <nav id="my-crumbs" class="lib-crumbs" aria-label="Foldery"></nav>
+          <div class="lib-actions">
+            <button id="btn-new-folder" class="btn btn-ghost btn-sm" type="button">+ Folder</button>
+            <button id="btn-new-material" class="btn btn-primary btn-sm" type="button">+ Materiał</button>
+          </div>
+        </div>
+        <ul id="my-list" class="lib-list"></ul>
+        <p id="my-empty" class="lib-empty hidden">Pusto tutaj. Dodaj materiał lub folder.</p>
+      </div>
+
+      <div id="tab-public" class="hidden">
+        <ul id="pub-list" class="lib-list"></ul>
+        <p id="pub-empty" class="lib-empty hidden">Brak materiałów od autora.</p>
+      </div>
+
+      <p id="lib-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ───────────────────────── EDYTOR ───────────────────────── -->
+    <section id="screen-editor" class="screen">
+      <div class="lead"><h1 id="editor-title" class="lead-title">Nowy materiał</h1></div>
+      <label class="field"><span>Tytuł</span>
+        <input id="ed-title" class="text-input" type="text" placeholder="np. Metodologia — kolokwium 1" />
+      </label>
+      <label class="field"><span>Typ</span>
+        <select id="ed-type" class="text-input">
+          <option value="auto">Wykryj automatycznie</option>
+          <option value="test">Test ABCD</option>
+          <option value="flashcards">Fiszki</option>
+        </select>
+      </label>
+      <label class="field"><span>Treść</span>
+        <textarea id="ed-content" class="paste-area" spellcheck="false"
+          placeholder="Test: Q:/A:/B:/C:/D:/CORRECT:  •  Fiszki: przód;tył"></textarea>
+      </label>
+      <div class="panel-actions">
+        <button id="btn-ed-sample-test" class="btn btn-link" type="button">Przykład: test</button>
+        <button id="btn-ed-sample-cards" class="btn btn-link" type="button">Przykład: fiszki</button>
+        <label class="btn btn-link" style="cursor:pointer">Wgraj plik
+          <input id="ed-file" type="file" accept=".txt,.csv,text/plain,text/csv" hidden />
+        </label>
+      </div>
+      <div class="editor-actions">
+        <button id="btn-ed-cancel" class="btn btn-ghost" type="button">Anuluj</button>
+        <button id="btn-ed-save" class="btn btn-primary" type="button">Zapisz</button>
+      </div>
+      <p id="ed-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ───────────────────────── PODGLĄD / START ───────────────────────── -->
+    <section id="screen-ready" class="screen">
+      <div class="ready">
+        <div class="ready-head">
+          <span id="ready-badge" class="badge">TEST</span>
+          <div class="ready-meta">
+            <span id="ready-title" class="ready-title">Materiał</span>
+            <span id="ready-count" class="ready-count"></span>
+          </div>
+        </div>
+        <div id="ready-options" class="ready-options"></div>
+        <button id="btn-start" class="btn btn-primary btn-lg" type="button">Rozpocznij</button>
+        <button id="btn-ready-back" class="btn btn-ghost btn-lg" type="button">Wróć</button>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── TEST ───────────────────────── -->
+    <section id="screen-test" class="screen">
+      <div class="session-bar">
+        <div class="progress-track"><div id="test-progress" class="progress-fill"></div></div>
+        <div class="session-stats">
+          <span id="test-count" class="stat">0 / 0</span>
+          <span id="test-score" class="stat stat-ok">✓ 0</span>
+        </div>
+      </div>
+      <div class="qcard">
+        <p id="test-question" class="qtext"></p>
+        <div id="test-answers" class="answers"></div>
+      </div>
+      <div class="session-controls">
+        <button id="btn-test-skip" class="btn btn-ghost" type="button">Pomiń</button>
+        <button id="btn-test-delete" class="btn btn-ghost btn-danger-ghost" type="button">Usuń pytanie</button>
+        <button id="btn-test-next" class="btn btn-primary" type="button" disabled>Dalej</button>
+      </div>
+      <p class="kbd-hint"><span class="kbd">1</span>–<span class="kbd">4</span> odpowiedź &middot; <span class="kbd">Enter</span> dalej &middot; <span class="kbd">S</span> pomiń</p>
+      <div class="session-controls"><button id="btn-test-quit" class="btn btn-link" type="button">Zakończ i wróć</button></div>
+    </section>
+
+    <!-- ───────────────────────── FISZKI ───────────────────────── -->
+    <section id="screen-flash" class="screen">
+      <div class="session-bar">
+        <div class="progress-track"><div id="flash-progress" class="progress-fill flash-fill"></div></div>
+        <div class="session-stats">
+          <span id="flash-count" class="stat">0 / 0</span>
+          <span id="flash-known" class="stat stat-ok">✓ 0</span>
+        </div>
+      </div>
+      <div id="flash-card" class="flashcard" tabindex="0" role="button" aria-label="Odwróć fiszkę">
+        <div class="flash-inner">
+          <div class="flash-face flash-front">
+            <span class="flash-label">Pytanie</span>
+            <p id="flash-front-text" class="flash-text"></p>
+            <span class="flash-tap">kliknij, aby odwrócić</span>
+          </div>
+          <div class="flash-face flash-back">
+            <span class="flash-label">Odpowiedź</span>
+            <p id="flash-back-text" class="flash-text"></p>
+          </div>
+        </div>
+      </div>
+      <div id="flash-controls-front" class="session-controls">
+        <button id="btn-flash-skip" class="btn btn-ghost" type="button">Pomiń</button>
+        <button id="btn-flash-delete" class="btn btn-ghost btn-danger-ghost" type="button">Usuń fiszkę</button>
+        <button id="btn-flash-flip" class="btn btn-primary" type="button">Pokaż odpowiedź</button>
+      </div>
+      <div id="flash-controls-grade" class="session-controls grade-controls hidden">
+        <button id="btn-flash-again" class="btn btn-grade btn-again" type="button">Powtórz</button>
+        <button id="btn-flash-known" class="btn btn-grade btn-known" type="button">Umiem</button>
+      </div>
+      <p class="kbd-hint"><span class="kbd">Spacja</span> odwróć &middot; <span class="kbd">1</span> powtórz &middot; <span class="kbd">2</span> umiem</p>
+      <div class="session-controls"><button id="btn-flash-quit" class="btn btn-link" type="button">Zakończ i wróć</button></div>
+    </section>
+
+    <!-- ───────────────────────── WYNIKI ───────────────────────── -->
+    <section id="screen-results" class="screen">
+      <div class="results-card">
+        <div id="results-ring" class="results-ring"><span id="results-pct" class="results-pct">0%</span></div>
+        <h2 id="results-title" class="results-title">Sesja zakończona</h2>
+        <p id="results-line" class="results-line"></p>
+        <div id="results-wrong" class="results-wrong"></div>
+        <div class="results-actions">
+          <button id="btn-retry-wrong" class="btn btn-primary" type="button">Powtórz błędne</button>
+          <button id="btn-retry-all" class="btn btn-secondary" type="button">Od nowa</button>
+          <button id="btn-results-home" class="btn btn-ghost" type="button">Do biblioteki</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer"><span>J-Learner — Twoja biblioteka fiszek i testów.</span></footer>
+
+  <script src="assets/config.js"></script>
+  <script src="assets/parsers.js"></script>
+  <script src="assets/supabase.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

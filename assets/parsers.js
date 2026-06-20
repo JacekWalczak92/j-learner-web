@@ -1,0 +1,138 @@
+// ============================================================================
+//  parsers.js — parsowanie materiałów wklejonych lub pobranych z Google Drive
+//  Formaty zgodne 1:1 z aplikacją Android (J-Learner / AnkiFiszki).
+//
+//  TEST ABCD (blok = 6 linii, bloki oddzielone pustą linią):
+//      Q: treść pytania
+//      A: odpowiedź A
+//      B: odpowiedź B
+//      C: odpowiedź C
+//      D: odpowiedź D
+//      CORRECT: A          (litera A/B/C/D — poprawna odpowiedź)
+//
+//  FISZKI (jedna fiszka = jedna linia):
+//      przód;tył              (średnik; albo tabulator)
+//      przód;tył;tagi         (tagi opcjonalne)
+// ============================================================================
+
+/** Usuwa prefiks "X:" / "x:" z początku linii i przycina białe znaki. */
+function stripPrefix(line, letter) {
+  const up = letter.toUpperCase() + ":";
+  const lo = letter.toLowerCase() + ":";
+  let v = line;
+  if (v.startsWith(up)) v = v.slice(up.length);
+  else if (v.startsWith(lo)) v = v.slice(lo.length);
+  return v.trim();
+}
+
+/**
+ * Parsuje tekst w formacie Q:/A:/B:/C:/D:/CORRECT: na listę pytań.
+ * @returns {Array<{question:string, answers:string[], correctIndex:number}>}
+ */
+function parseTestText(text) {
+  const questions = [];
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  let i = 0;
+  while (i < lines.length) {
+    const qLine = lines[i];
+    if (!/^q:/i.test(qLine)) {
+      i++;
+      continue;
+    }
+    const question = stripPrefix(qLine, "Q");
+    const aLine = lines[i + 1];
+    const bLine = lines[i + 2];
+    const cLine = lines[i + 3];
+    const dLine = lines[i + 4];
+    const correctLine = lines[i + 5];
+
+    if (aLine && bLine && cLine && dLine && correctLine) {
+      const a = stripPrefix(aLine, "A");
+      const b = stripPrefix(bLine, "B");
+      const c = stripPrefix(cLine, "C");
+      const d = stripPrefix(dLine, "D");
+      const correct = stripPrefix(correctLine, "CORRECT").toUpperCase();
+      const correctIndex =
+        correct === "A" ? 0 : correct === "B" ? 1 : correct === "C" ? 2 : correct === "D" ? 3 : 0;
+      if (question && a) {
+        questions.push({ question, answers: [a, b, c, d], correctIndex });
+      }
+      i += 6;
+    } else {
+      i++;
+    }
+  }
+  return questions;
+}
+
+/**
+ * Parsuje tekst fiszek (przód;tył;tagi lub z tabulatorem) na listę kart.
+ * @returns {Array<{front:string, back:string, tags:string}>}
+ */
+function parseFlashcardText(text) {
+  const cards = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+
+    let parts;
+    if (trimmed.includes(";")) parts = splitLimit(trimmed, ";", 3);
+    else if (trimmed.includes("\t")) parts = splitLimit(trimmed, "\t", 3);
+    else continue;
+
+    if (parts.length >= 2 && parts[0].trim() && parts[1].trim()) {
+      cards.push({
+        front: parts[0].trim(),
+        back: parts[1].trim(),
+        tags: parts.length >= 3 ? parts[2].trim() : "",
+      });
+    }
+  }
+  return cards;
+}
+
+/** split z limitem jak w Kotlinie: ostatni element zachowuje resztę z separatorami. */
+function splitLimit(str, sep, limit) {
+  const out = [];
+  let rest = str;
+  while (out.length < limit - 1) {
+    const idx = rest.indexOf(sep);
+    if (idx === -1) break;
+    out.push(rest.slice(0, idx));
+    rest = rest.slice(idx + sep.length);
+  }
+  out.push(rest);
+  return out;
+}
+
+/**
+ * Wykrywa typ materiału na podstawie zawartości.
+ * @returns {"test"|"flashcards"|"unknown"}
+ */
+function detectMaterialType(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  if (lines.some((l) => /^q:/i.test(l))) return "test";
+
+  const looksLikeCard = lines.some((l) => {
+    const parts = l.includes(";") ? l.split(";") : l.includes("\t") ? l.split("\t") : [];
+    return parts.length >= 2 && parts[0].trim() && parts[1].trim();
+  });
+  if (looksLikeCard) return "flashcards";
+
+  return "unknown";
+}
+
+// Eksport do globalnego zakresu (aplikacja używa zwykłych <script>).
+window.JLParsers = {
+  parseTestText,
+  parseFlashcardText,
+  detectMaterialType,
+};

@@ -1,0 +1,20 @@
+Q: Który obszar mózgu odpowiada za pamięć długotrwałą?
+A: Móżdżek
+B: Hipokamp
+C: Ciało migdałowate
+D: Most
+CORRECT: B
+
+Q: Zmienna, którą badacz celowo manipuluje, to zmienna:
+A: zależna
+B: zakłócająca
+C: niezależna
+D: pośrednicząca
+CORRECT: C
+
+Q: Co opisuje rzetelność testu psychometrycznego?
+A: Trafność treściową
+B: Spójność i powtarzalność pomiaru
+C: Liczbę pozycji testowych
+D: Normy stenowe
+CORRECT: B
