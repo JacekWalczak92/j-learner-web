@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
+  <a class="skip-link" href="#main">Przejdź do treści</a>
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">JL</span>
@@ -97,7 +98,7 @@
       <div class="panel-actions">
         <button id="btn-ed-sample-test" class="btn btn-link" type="button">Przykład: test</button>
         <button id="btn-ed-sample-cards" class="btn btn-link" type="button">Przykład: fiszki</button>
-        <label class="btn btn-link" style="cursor:pointer">Wgraj plik
+        <label class="btn btn-link file-upload-label">Wgraj plik
           <input id="ed-file" type="file" accept=".txt,.csv,text/plain,text/csv" hidden />
         </label>
       </div>
@@ -118,8 +119,13 @@
             <span id="ready-count" class="ready-count"></span>
           </div>
         </div>
+        <div class="ready-modes-label">Tryb nauki</div>
+        <div id="ready-modes" class="ready-modes"></div>
         <div id="ready-options" class="ready-options"></div>
+        <p id="ready-progress" class="ready-progress"></p>
         <button id="btn-start" class="btn btn-primary btn-lg" type="button">Rozpocznij</button>
+        <button id="btn-reset-progress" class="btn btn-link hidden" type="button">Resetuj postęp…</button>
+        <div id="reset-panel" class="reset-panel hidden"></div>
         <button id="btn-ready-back" class="btn btn-ghost btn-lg" type="button">Wróć</button>
       </div>
     </section>
@@ -137,12 +143,30 @@
         <p id="test-question" class="qtext"></p>
         <div id="test-answers" class="answers"></div>
       </div>
-      <div class="session-controls">
+      <div id="test-controls" class="session-controls">
         <button id="btn-test-skip" class="btn btn-ghost" type="button">Pomiń</button>
         <button id="btn-test-delete" class="btn btn-ghost btn-danger-ghost" type="button">Usuń pytanie</button>
         <button id="btn-test-next" class="btn btn-primary" type="button" disabled>Dalej</button>
       </div>
-      <p class="kbd-hint"><span class="kbd">1</span>–<span class="kbd">4</span> odpowiedź &middot; <span class="kbd">Enter</span> dalej &middot; <span class="kbd">S</span> pomiń</p>
+      <div id="test-rating" class="session-controls grade-controls hidden">
+        <button id="btn-rate-hard" class="btn btn-grade g-hard" type="button"><span class="g-label">Trudne</span><span class="g-hint">wróci jako ABCD</span></button>
+        <button id="btn-rate-easy" class="btn btn-grade g-easy" type="button"><span class="g-label">Łatwe</span><span class="g-hint">wróci do wpisania</span></button>
+      </div>
+      <div id="test-textwrap" class="textwrap hidden">
+        <label class="field"><span>Wpisz odpowiedź z pamięci</span>
+          <input id="test-typed" class="text-input" type="text" autocomplete="off" spellcheck="false" />
+        </label>
+        <div id="test-text-reveal" class="ti-reveal hidden"><span class="ti-label">Poprawna odpowiedź</span><span id="test-correct" class="ti-correct"></span></div>
+        <div id="test-text-show" class="session-controls">
+          <button id="btn-text-show" class="btn btn-primary" type="button">Pokaż odpowiedź</button>
+        </div>
+        <div id="test-text-grade" class="session-controls grade-controls hidden">
+          <button id="btn-text-pass" class="btn btn-grade g-easy" type="button"><span class="g-label">Zaliczam</span><span class="g-hint">opanowane</span></button>
+          <button id="btn-text-hard" class="btn btn-grade g-hard" type="button"><span class="g-label">Trudne</span><span class="g-hint">wróci jako ABCD</span></button>
+          <button id="btn-text-easy" class="btn btn-grade g-good" type="button"><span class="g-label">Łatwe</span><span class="g-hint">wróci do wpisania</span></button>
+        </div>
+      </div>
+      <p id="test-hint" class="kbd-hint"><span class="kbd">1</span>–<span class="kbd">4</span> odpowiedź &middot; <span class="kbd">Enter</span> dalej &middot; <span class="kbd">S</span> pomiń</p>
       <div class="session-controls"><button id="btn-test-quit" class="btn btn-link" type="button">Zakończ i wróć</button></div>
     </section>
 
@@ -173,11 +197,9 @@
         <button id="btn-flash-delete" class="btn btn-ghost btn-danger-ghost" type="button">Usuń fiszkę</button>
         <button id="btn-flash-flip" class="btn btn-primary" type="button">Pokaż odpowiedź</button>
       </div>
-      <div id="flash-controls-grade" class="session-controls grade-controls hidden">
-        <button id="btn-flash-again" class="btn btn-grade btn-again" type="button">Powtórz</button>
-        <button id="btn-flash-known" class="btn btn-grade btn-known" type="button">Umiem</button>
-      </div>
-      <p class="kbd-hint"><span class="kbd">Spacja</span> odwróć &middot; <span class="kbd">1</span> powtórz &middot; <span class="kbd">2</span> umiem</p>
+      <div id="flash-controls-grade" class="hidden"></div>
+      <div id="flash-grades" class="session-controls grade-controls hidden"></div>
+      <p class="kbd-hint"><span class="kbd">Spacja</span> odwróć &middot; <span class="kbd">1</span>–<span class="kbd">4</span> ocena</p>
       <div class="session-controls"><button id="btn-flash-quit" class="btn btn-link" type="button">Zakończ i wróć</button></div>
     </section>
 

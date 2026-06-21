@@ -176,6 +176,38 @@ async function copyToMine(id, folderId) {
   return createMaterial({ title: m.title, type: m.type, content: m.content, folderId: folderId || null });
 }
 
+// ── Postęp nauki (per materiał / karta / tryb) ───────────────────────────────
+function listProgress(materialId, mode) {
+  let q = "/progress?select=card_key,passed,difficulty,times_shown&material_id=eq." + encodeURIComponent(materialId);
+  if (mode) q += "&mode=eq." + encodeURIComponent(mode);
+  return rest(q);
+}
+/** rows: [{ material_id, card_key, mode, passed, difficulty?, times_shown? }] */
+function upsertProgress(rows) {
+  if (!rows || !rows.length) return Promise.resolve(null);
+  const uid = getUserId();
+  const body = rows.map((r) => ({
+    user_id: uid,
+    material_id: r.material_id,
+    card_key: r.card_key,
+    mode: r.mode,
+    passed: r.passed !== false,
+    difficulty: r.difficulty || "none",
+    times_shown: r.times_shown || 0,
+  }));
+  return rest("/progress?on_conflict=user_id,material_id,card_key,mode", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body,
+  });
+}
+/** Reset postępu materiału — całego (mode=null) lub jednego trybu. */
+function resetProgress(materialId, mode) {
+  let q = "/progress?material_id=eq." + encodeURIComponent(materialId);
+  if (mode) q += "&mode=eq." + encodeURIComponent(mode);
+  return rest(q, { method: "DELETE" });
+}
+
 window.JLDB = {
   isConfigured,
   getUser,
@@ -192,4 +224,7 @@ window.JLDB = {
   updateMaterial,
   deleteMaterial,
   copyToMine,
+  listProgress,
+  upsertProgress,
+  resetProgress,
 };

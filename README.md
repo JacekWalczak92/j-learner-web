@@ -8,12 +8,22 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
 
 - **Konta** (e-mail + hasło) — logowanie i rejestracja.
 - **Moje materiały** — foldery (zagnieżdżone), tworzenie/edycja/usuwanie testów i fiszek,
-  wbudowany edytor z wykrywaniem formatu, import z pliku.
+  wbudowany edytor z wykrywaniem formatu, import z pliku. Nowe konto dostaje dwa
+  domyślne foldery: **Testy ABCD** i **Fiszki**.
 - **Od autora** — publiczne materiały, które publikujesz; każdy może je otworzyć lub
   „skopiować do moich".
-- **Sesje** — test ABCD (natychmiastowe odsłanianie odpowiedzi, pomijanie, usuwanie,
-  powtórka błędnych) oraz fiszki (odwracanie, „Umiem/Powtórz"), z podsumowaniem.
-- Skróty klawiszowe: test `1`–`4`, `Enter`, `S`; fiszki `Spacja`, `1`, `2`.
+- **Tryby nauki** (jak w aplikacji mobilnej) — wybierane przy starcie materiału:
+  - testy ABCD: **Quiz klasyczny** (ABCD → wpisywanie z pamięci, powtarza aż opanujesz),
+    **Sesja testowa** (ABCD, wynik na końcu, powtórka błędnych), **Fiszki**
+    (pokaż odpowiedź → Powtórz / Trudne / Dobre / Łatwe);
+  - fiszki: **Nauka** (przerabiasz całość, karta wraca aż „Łatwe") i **Przegląd**
+    (szybka powtórka — „Dobre" lub „Łatwe" kończy kartę).
+- Skróty klawiszowe: ABCD `1`–`4`, `Enter`, `S`; oceny fiszek `Spacja`, `1`–`4`.
+- **Zapis postępu** — co zaliczysz w danym trybie, zapisuje się na koncie (Supabase).
+  Kolejna sesja rusza od niezaliczonych. Postęp jest **osobny dla każdego trybu** i można
+  go **zresetować** (na ekranie startu): dla testów *Quiz klasyczny / Sesja testowa /
+  Fiszki / Wszystko*, dla fiszek *Nauka / Przegląd / Wszystko*. (Bez harmonogramu
+  spaced repetition — trzymamy tylko „zaliczone”.)
 
 ## Uruchomienie lokalnie
 

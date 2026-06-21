@@ -48,14 +48,32 @@ function initApp() {
   else showScreen("screen-auth");
 }
 
-function enterApp() {
+async function enterApp() {
   const u = DB.getUser();
   $("#user-email").textContent = u ? u.email : "";
   $("#user-box").classList.remove("hidden");
   state.my.stack = [{ id: null, name: "Moje materiały" }];
   state.my._dirty = true;
-  switchTab("mine");
   showScreen("screen-library");
+  await seedDefaultFolders();
+  switchTab("mine");
+}
+
+/** Tworzy domyślne foldery „Testy ABCD” i „Fiszki” — raz na użytkownika. */
+async function seedDefaultFolders() {
+  const u = DB.getUser();
+  if (!u) return;
+  const flag = "jl_seeded_" + u.id;
+  try { if (localStorage.getItem(flag)) return; } catch (_) {}
+  try {
+    const folders = await DB.listFolders();
+    if (folders && folders.length === 0) {
+      await DB.createFolder("Testy ABCD", null);
+      await DB.createFolder("Fiszki", null);
+    }
+    try { localStorage.setItem(flag, "1"); } catch (_) {}
+    state.my._dirty = true;
+  } catch (_) {}
 }
 
 async function doSignIn() {
@@ -63,7 +81,7 @@ async function doSignIn() {
   const pass = $("#auth-pass").value;
   if (!email || !pass) return setAuthStatus("Podaj e-mail i hasło.", "err");
   setAuthStatus("Logowanie…");
-  try { await DB.signIn(email, pass); setAuthStatus(""); enterApp(); }
+  try { await DB.signIn(email, pass); setAuthStatus(""); await enterApp(); }
   catch (e) { setAuthStatus(e.message, "err"); }
 }
 
@@ -75,7 +93,7 @@ async function doSignUp() {
   try {
     const { needsConfirm } = await DB.signUp(email, pass);
     if (needsConfirm) setAuthStatus("Konto utworzone. Potwierdź adres e-mail, potem się zaloguj.", "ok");
-    else { setAuthStatus(""); enterApp(); }
+    else { setAuthStatus(""); await enterApp(); }
   } catch (e) { setAuthStatus(e.message, "err"); }
 }
 
@@ -315,7 +333,7 @@ async function openMaterial(id) {
     if (!m) return setLibStatus("Nie znaleziono materiału.", "err");
     const items = m.type === "test" ? JLP.parseTestText(m.content) : JLP.parseFlashcardText(m.content);
     if (!items.length) return setLibStatus("Materiał jest pusty lub w złym formacie.", "err");
-    state.material = { type: m.type, name: m.title, items };
+    state.material = { id: m.id, type: m.type, name: m.title, items };
     setLibStatus("");
     renderReady();
     showScreen("screen-ready");
@@ -331,16 +349,65 @@ function renderReady() {
   $("#ready-count").textContent = isTest
     ? `${mat.items.length} ${plural(mat.items.length, "pytanie", "pytania", "pytań")}`
     : `${mat.items.length} ${plural(mat.items.length, "fiszka", "fiszki", "fiszek")}`;
-  const opts = $("#ready-options");
-  if (isTest) {
-    opts.innerHTML = `
-      <label class="opt"><input type="checkbox" id="opt-shuffle-q" checked><span class="opt-text"><b>Losowa kolejność pytań</b></span></label>
-      <label class="opt"><input type="checkbox" id="opt-shuffle-a" checked><span class="opt-text"><b>Losowa kolejność odpowiedzi</b></span></label>`;
-  } else {
-    opts.innerHTML = `
-      <label class="opt"><input type="checkbox" id="opt-shuffle-c" checked><span class="opt-text"><b>Losowa kolejność fiszek</b></span></label>
-      <label class="opt"><input type="checkbox" id="opt-reverse"><span class="opt-text"><b>Odwróć strony</b><small>Pokazuj najpierw odpowiedź</small></span></label>`;
+
+  const modes = isTest ? TEST_MODES : FLASH_MODES;
+  state.mode = modes[0].key;
+  const box = $("#ready-modes");
+  box.innerHTML = "";
+  modes.forEach((m, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "mode-tile" + (i === 0 ? " active" : "");
+    b.innerHTML =
+      `<span class="mode-ico">${m.icon}</span>` +
+      `<span class="mode-meta"><span class="mode-name">${m.label}</span><span class="mode-desc">${m.desc}</span></span>`;
+    b.addEventListener("click", () => selectMode(m.key, b));
+    box.appendChild(b);
+  });
+  $("#reset-panel").classList.add("hidden");
+  selectMode(modes[0].key, box.firstChild);
+}
+
+function selectMode(key, tileEl) {
+  state.mode = key;
+  $$("#ready-modes .mode-tile").forEach((t) => t.classList.toggle("active", t === tileEl));
+  $("#reset-panel").classList.add("hidden");
+  renderReadyOptions();
+  loadModeProgress(key);
+}
+
+// ── Postęp: ładowanie i wyświetlanie dla wybranego trybu ─────────────────────
+async function loadModeProgress(mode) {
+  const line = $("#ready-progress");
+  const resetBtn = $("#btn-reset-progress");
+  state.ready = { mode, passed: new Set() };
+  if (!DB.isConfigured() || !state.material.id) { line.textContent = ""; resetBtn.classList.add("hidden"); return; }
+  line.textContent = "Ładuję postęp…";
+  try {
+    const rows = await DB.listProgress(state.material.id, mode);
+    if (state.ready.mode !== mode) return; // zmieniono tryb w międzyczasie
+    const passed = new Set((rows || []).filter((r) => r.passed).map((r) => r.card_key));
+    state.ready.passed = passed;
+    const total = state.material.items.length;
+    line.textContent = `Postęp w tym trybie: ${passed.size} / ${total} zaliczone`;
+    resetBtn.classList.toggle("hidden", passed.size === 0);
+  } catch (e) {
+    line.textContent = "";
+    resetBtn.classList.add("hidden");
   }
+}
+
+const OPT_Q = `<label class="opt"><input type="checkbox" id="opt-shuffle-q" checked><span class="opt-text"><b>Losowa kolejność pytań</b></span></label>`;
+const OPT_A = `<label class="opt"><input type="checkbox" id="opt-shuffle-a" checked><span class="opt-text"><b>Losowa kolejność odpowiedzi</b></span></label>`;
+const OPT_C = `<label class="opt"><input type="checkbox" id="opt-shuffle-c" checked><span class="opt-text"><b>Losowa kolejność fiszek</b></span></label>`;
+const OPT_REV = `<label class="opt"><input type="checkbox" id="opt-reverse"><span class="opt-text"><b>Odwróć strony</b><small>Pokazuj najpierw odpowiedź</small></span></label>`;
+
+function renderReadyOptions() {
+  const m = state.mode;
+  const opts = $("#ready-options");
+  if (m === "exam" || m === "classic") opts.innerHTML = OPT_Q + OPT_A;
+  else if (m === "tflash") opts.innerHTML = OPT_Q;
+  else opts.innerHTML = OPT_C + OPT_REV;
 }
 
 function plural(n, one, few, many) {
@@ -352,13 +419,126 @@ function plural(n, one, few, many) {
 
 $("#btn-ready-back").addEventListener("click", () => showScreen("screen-library"));
 
-// ── Start sesji ────────────────────────────────────────────────────────────────
+// ── Definicje trybów (jak w aplikacji mobilnej) ───────────────────────────────
+const TEST_MODES = [
+  { key: "classic", icon: "🎯", label: "Quiz klasyczny", desc: "ABCD, potem wpisywanie z pamięci. Powtarza, aż opanujesz." },
+  { key: "exam", icon: "📝", label: "Sesja testowa", desc: "Tylko ABCD, wynik na końcu, kolejna sesja = błędne." },
+  { key: "tflash", icon: "🃏", label: "Fiszki", desc: "Pytanie → odpowiedź, oceniasz: Powtórz / Trudne / Dobre / Łatwe." },
+];
+const FLASH_MODES = [
+  { key: "nauka", icon: "📚", label: "Nauka", desc: "Przerabiasz całość; karta wraca, dopóki nie klikniesz „Łatwe”." },
+  { key: "przeglad", icon: "🔁", label: "Przegląd", desc: "Szybka powtórka; „Dobre” lub „Łatwe” kończy kartę." },
+];
+
+const GRADE_CFG = {
+  tflash: { title: "Fiszki", color: "var(--indigo)", grades: [
+    { label: "Powtórz", hint: "zaraz", pos: 0, cls: "g-again" },
+    { label: "Trudne", hint: "za ~2", pos: 2, cls: "g-hard" },
+    { label: "Dobre", hint: "za ~5", pos: 5, cls: "g-good" },
+    { label: "Łatwe", hint: "koniec", pos: null, cls: "g-easy" },
+  ] },
+  nauka: { title: "Nauka", color: "var(--amber)", grades: [
+    { label: "Powtórz", hint: "za 1", pos: 1, cls: "g-again" },
+    { label: "Trudne", hint: "za 3", pos: 3, cls: "g-hard" },
+    { label: "Dobre", hint: "za 6", pos: 6, cls: "g-good" },
+    { label: "Łatwe", hint: "koniec", pos: null, cls: "g-easy" },
+  ] },
+  przeglad: { title: "Przegląd", color: "var(--amber)", grades: [
+    { label: "Powtórz", hint: "za 1", pos: 1, cls: "g-again" },
+    { label: "Trudne", hint: "za 2", pos: 2, cls: "g-hard" },
+    { label: "Dobre", hint: "koniec", pos: null, cls: "g-good" },
+    { label: "Łatwe", hint: "koniec", pos: null, cls: "g-easy" },
+  ] },
+};
+
+// ── Postęp: odcisk karty + zapis + reset ─────────────────────────────────────
+function _norm(s) { return String(s == null ? "" : s).trim().replace(/\s+/g, " "); }
+function _fnv1a(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(36); }
+function cardKey(front, back) { return _fnv1a(_norm(front) + "\u0001" + _norm(back)); }
+function testKey(q) { return cardKey(q.question, q.answers[q.correctIndex]); }
+function flashKey(c) { return cardKey(c.front, c.back); }
+
+function persistProgress(mode, rows) {
+  if (!DB.isConfigured() || typeof DB.upsertProgress !== "function" || !state.material || !state.material.id || !rows.length) return;
+  const mid = state.material.id;
+  DB.upsertProgress(rows.map((r) => ({ material_id: mid, card_key: r.card_key, mode, passed: r.passed !== false, difficulty: r.difficulty }))).catch(() => {});
+}
+
+function allDoneNotice() {
+  const line = $("#ready-progress");
+  line.textContent = "Wszystko już zaliczone w tym trybie — zresetuj, aby powtórzyć.";
+  line.classList.add("done");
+  $("#btn-reset-progress").classList.remove("hidden");
+}
+
+// ── Reset postępu (etykiety jak w aplikacji mobilnej) ─────────────────────────
+const RESET_GROUPS = {
+  test: [
+    { label: "Quiz klasyczny", mode: "classic" },
+    { label: "Sesja testowa", mode: "exam" },
+    { label: "Fiszki", mode: "flash" },
+    { label: "Wszystko", mode: null, danger: true },
+  ],
+  flashcards: [
+    { label: "Nauka", mode: "nauka" },
+    { label: "Przegląd", mode: "przeglad" },
+    { label: "Wszystko", mode: null, danger: true },
+  ],
+};
+function buildResetPanel() {
+  const panel = $("#reset-panel");
+  const groups = state.material.type === "test" ? RESET_GROUPS.test : RESET_GROUPS.flashcards;
+  panel.innerHTML = `<p class="reset-head">Wyczyść zaliczenia:</p>`;
+  groups.forEach((g) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-ghost reset-opt" + (g.danger ? " btn-danger-ghost" : "");
+    b.textContent = g.label;
+    b.addEventListener("click", () => doReset(g.mode, g.label));
+    panel.appendChild(b);
+  });
+}
+$("#btn-reset-progress").addEventListener("click", () => {
+  const panel = $("#reset-panel");
+  if (panel.classList.contains("hidden")) { buildResetPanel(); panel.classList.remove("hidden"); }
+  else panel.classList.add("hidden");
+});
+async function doReset(mode, label) {
+  const what = mode ? `tryb „${label}”` : "wszystkie tryby";
+  if (!window.confirm(`Zresetować postęp — ${what}? Tej operacji nie można cofnąć.`)) return;
+  try {
+    await DB.resetProgress(state.material.id, mode);
+    $("#reset-panel").classList.add("hidden");
+    $("#ready-progress").classList.remove("done");
+    loadModeProgress(state.mode);
+  } catch (e) { alert("Nie udało się zresetować: " + e.message); }
+}
+
+// ── Start sesji — dyspozytor trybu (z pominięciem zaliczonych) ────────────────
 $("#btn-start").addEventListener("click", () => {
-  if (!state.material) return;
-  if (state.material.type === "test") {
-    startTest(state.material.items, { shuffleQ: $("#opt-shuffle-q")?.checked, shuffleA: $("#opt-shuffle-a")?.checked });
+  const mat = state.material;
+  if (!mat) return;
+  $("#ready-progress").classList.remove("done");
+  const passed = (state.ready && state.ready.passed) || new Set();
+  const sq = $("#opt-shuffle-q")?.checked, sa = $("#opt-shuffle-a")?.checked;
+  const sc = $("#opt-shuffle-c")?.checked, rev = $("#opt-reverse")?.checked;
+
+  if (state.mode === "exam" || state.mode === "classic") {
+    const qs = mat.items.map((q) => ({ ...q, key: testKey(q) }));
+    const remaining = qs.filter((q) => !passed.has(q.key));
+    if (!remaining.length) return allDoneNotice();
+    if (state.mode === "exam") startExam(remaining, { shuffleQ: sq, shuffleA: sa });
+    else startClassic(remaining, { shuffleQ: sq, shuffleA: sa });
+  } else if (state.mode === "tflash") {
+    const cards = mat.items.map((q) => ({ front: q.question, back: q.answers[q.correctIndex], key: testKey(q) }));
+    const remaining = cards.filter((c) => !passed.has(c.key));
+    if (!remaining.length) return allDoneNotice();
+    startGrade(remaining, GRADE_CFG.tflash, sq, "flash");
   } else {
-    startFlash(state.material.items, { shuffle: $("#opt-shuffle-c")?.checked, reverse: $("#opt-reverse")?.checked });
+    const cards = mat.items.map((c) => { const key = flashKey(c); return rev ? { front: c.back, back: c.front, key } : { front: c.front, back: c.back, key }; });
+    const remaining = cards.filter((c) => !passed.has(c.key));
+    if (!remaining.length) return allDoneNotice();
+    startGrade(remaining, GRADE_CFG[state.mode], sc, state.mode);
   }
 });
 
@@ -370,144 +550,235 @@ function shuffled(arr) {
   }
   return a;
 }
+function insertAt(arr, pos, item) { arr.splice(Math.min(pos, arr.length), 0, item); }
 
-// ════════════════════════════════════════════════════════════════════════════
-//  SESJA TESTOWA (ABCD)
-// ════════════════════════════════════════════════════════════════════════════
-function startTest(items, { shuffleQ = true, shuffleA = true } = {}) {
-  const prepared = items.map((q) => {
-    let answers = q.answers.map((text, idx) => ({ text, correct: idx === q.correctIndex }));
-    if (shuffleA) answers = shuffled(answers);
-    return { question: q.question, answers };
+function prepareItems(items, shuffleA) {
+  return items.map((q) => {
+    let arr = q.answers.map((text, idx) => ({ text, correct: idx === q.correctIndex }));
+    if (shuffleA) arr = shuffled(arr);
+    return { question: q.question, answers: arr.map((a) => a.text), correctIndex: arr.findIndex((a) => a.correct), key: q.key };
   });
-  state.test = { queue: shuffleQ ? shuffled(prepared) : prepared, pos: 0, total: prepared.length, correct: 0, locked: false, wrong: [] };
-  showScreen("screen-test");
-  renderTestQuestion();
+}
+function buildAnswers(box, answers, handler) {
+  const keys = ["A", "B", "C", "D"];
+  box.innerHTML = "";
+  answers.forEach((text, i) => {
+    const b = document.createElement("button");
+    b.className = "answer"; b.type = "button";
+    b.innerHTML = `<span class="answer-key">${keys[i] || i + 1}</span><span>${escapeHtml(text)}</span>`;
+    b.addEventListener("click", () => handler(i));
+    box.appendChild(b);
+  });
+}
+function revealAnswerButtons(correctIndex, chosen) {
+  $$("#test-answers .answer").forEach((b, idx) => {
+    b.disabled = true;
+    if (idx === correctIndex) b.classList.add("correct");
+    else if (idx === chosen) b.classList.add("wrong");
+  });
 }
 
-function renderTestQuestion() {
+// ════════════════════════════════════════════════════════════════════════════
+//  TRYB: SESJA TESTOWA (EXAM) — ABCD, wynik na końcu
+// ════════════════════════════════════════════════════════════════════════════
+function startExam(items, { shuffleQ = true, shuffleA = true } = {}) {
+  const prepared = prepareItems(items, shuffleA);
+  state.test = { queue: shuffleQ ? shuffled(prepared) : prepared, pos: 0, total: prepared.length, correct: 0, locked: false, wrong: [] };
+  state.restart = () => startExam(items, { shuffleQ, shuffleA });
+  state.testScreenMode = "exam";
+  showScreen("screen-test");
+  renderExam();
+}
+function renderExam() {
   const t = state.test;
-  if (t.pos >= t.queue.length) return finishTest();
+  if (t.pos >= t.queue.length) return finishExam();
   const q = t.queue[t.pos];
   t.locked = false;
+  $("#test-controls").classList.remove("hidden");
+  $("#test-rating").classList.add("hidden");
+  $("#test-textwrap").classList.add("hidden");
+  $("#test-answers").classList.remove("hidden");
   $("#test-question").textContent = q.question;
   $("#test-count").textContent = `${t.pos + 1} / ${t.total}`;
   $("#test-score").textContent = `✓ ${t.correct}`;
   $("#test-progress").style.width = `${(t.pos / t.total) * 100}%`;
   $("#btn-test-next").disabled = true;
-  const keys = ["A", "B", "C", "D"];
-  const box = $("#test-answers");
-  box.innerHTML = "";
-  q.answers.forEach((ans, i) => {
-    const btn = document.createElement("button");
-    btn.className = "answer";
-    btn.type = "button";
-    btn.innerHTML = `<span class="answer-key">${keys[i] || i + 1}</span><span>${escapeHtml(ans.text)}</span>`;
-    btn.addEventListener("click", () => answerTest(i));
-    box.appendChild(btn);
-  });
+  buildAnswers($("#test-answers"), q.answers, answerExam);
 }
-
-function answerTest(index) {
+function answerExam(i) {
   const t = state.test;
   if (t.locked) return;
   t.locked = true;
   const q = t.queue[t.pos];
-  $$("#test-answers .answer").forEach((b, i) => {
-    b.disabled = true;
-    if (q.answers[i].correct) b.classList.add("correct");
-    else if (i === index) b.classList.add("wrong");
-  });
-  if (q.answers[index].correct) { t.correct++; $("#test-score").textContent = `✓ ${t.correct}`; }
+  revealAnswerButtons(q.correctIndex, i);
+  if (i === q.correctIndex) { t.correct++; $("#test-score").textContent = `✓ ${t.correct}`; }
   else t.wrong.push(q);
   $("#btn-test-next").disabled = false;
   $("#btn-test-next").focus();
 }
-
-function nextTest() { const t = state.test; if (!t.locked && t.pos < t.queue.length) return; t.pos++; renderTestQuestion(); }
-function skipTest() { const t = state.test; if (t.locked) return; t.wrong.push(t.queue[t.pos]); t.pos++; renderTestQuestion(); }
-function deleteTestQuestion() { const t = state.test; t.queue.splice(t.pos, 1); t.total = t.queue.length; if (t.total === 0) return finishTest(); renderTestQuestion(); }
-
-function finishTest() {
+function nextExam() { const t = state.test; if (!t.locked && t.pos < t.queue.length) return; t.pos++; renderExam(); }
+function skipExam() { const t = state.test; if (t.locked) return; t.wrong.push(t.queue[t.pos]); t.pos++; renderExam(); }
+function deleteExam() { const t = state.test; t.queue.splice(t.pos, 1); t.total = t.queue.length; if (t.total === 0) return finishExam(); renderExam(); }
+function finishExam() {
   const t = state.test;
+  const wrongKeys = new Set(t.wrong.map((q) => testKey(q)));
+  const passedRows = t.queue.filter((q) => !wrongKeys.has(testKey(q))).map((q) => ({ card_key: testKey(q), passed: true }));
+  persistProgress("exam", passedRows);
   const pct = t.total ? Math.round((t.correct / t.total) * 100) : 0;
   const retry = t.wrong.slice();
   showResults({
-    pct, title: "Test zakończony", line: `${t.correct} / ${t.total} poprawnych odpowiedzi`, color: "var(--indigo)",
-    wrong: retry.map((q) => ({ question: q.question, answer: (q.answers.find((a) => a.correct) || {}).text || "" })),
-    onRetryWrong: retry.length ? () => startTest(retry.map((q) => ({ question: q.question, answers: q.answers.map((a) => a.text), correctIndex: q.answers.findIndex((a) => a.correct) })), { shuffleQ: true, shuffleA: true }) : null,
-    onRetryAll: () => startTest(state.material.items, { shuffleQ: true, shuffleA: true }),
+    pct, title: "Sesja testowa — koniec", line: `${t.correct} / ${t.total} poprawnych odpowiedzi`, color: "var(--indigo)",
+    wrong: retry.map((q) => ({ question: q.question, answer: q.answers[q.correctIndex] || "" })),
+    onRetryWrong: retry.length ? () => startExam(retry.map((q) => ({ question: q.question, answers: q.answers, correctIndex: q.correctIndex })), { shuffleQ: true, shuffleA: true }) : null,
+    onRetryAll: state.restart,
   });
 }
-
-$("#btn-test-next").addEventListener("click", nextTest);
-$("#btn-test-skip").addEventListener("click", skipTest);
-$("#btn-test-delete").addEventListener("click", deleteTestQuestion);
+$("#btn-test-next").addEventListener("click", nextExam);
+$("#btn-test-skip").addEventListener("click", skipExam);
+$("#btn-test-delete").addEventListener("click", deleteExam);
 $("#btn-test-quit").addEventListener("click", () => showScreen("screen-library"));
 
 // ════════════════════════════════════════════════════════════════════════════
-//  SESJA FISZEK
+//  TRYB: QUIZ KLASYCZNY (CLASSIC) — ABCD + wpisywanie z pamięci, aż opanujesz
 // ════════════════════════════════════════════════════════════════════════════
-function startFlash(items, { shuffle = true, reverse = false } = {}) {
-  const cards = items.map((c) => ({ front: reverse ? c.back : c.front, back: reverse ? c.front : c.back }));
-  state.flash = { queue: shuffle ? shuffled(cards) : cards.slice(), total: cards.length, known: 0, flipped: false };
-  showScreen("screen-flash");
-  renderFlashCard();
+function startClassic(items, { shuffleQ = true, shuffleA = true } = {}) {
+  const prepared = prepareItems(items, shuffleA);
+  const order = shuffleQ ? shuffled(prepared) : prepared;
+  state.classic = { queue: order.map((it) => ({ item: it, mode: "abcd" })), total: prepared.length, passed: 0, locked: false };
+  state.restart = () => startClassic(items, { shuffleQ, shuffleA });
+  state.testScreenMode = "classic";
+  showScreen("screen-test");
+  renderClassic();
 }
+function renderClassic() {
+  const c = state.classic;
+  if (c.queue.length === 0 || c.passed >= c.total) return finishClassic();
+  const e = c.queue[0];
+  c.locked = false;
+  $("#test-question").textContent = e.item.question;
+  $("#test-count").textContent = `${c.passed} / ${c.total}`;
+  $("#test-score").textContent = `✓ ${c.passed}`;
+  $("#test-progress").style.width = `${(c.passed / c.total) * 100}%`;
+  $("#test-controls").classList.add("hidden");
+  $("#test-rating").classList.add("hidden");
+  if (e.mode === "abcd") {
+    $("#test-textwrap").classList.add("hidden");
+    $("#test-answers").classList.remove("hidden");
+    buildAnswers($("#test-answers"), e.item.answers, classicAnswer);
+  } else {
+    $("#test-answers").classList.add("hidden");
+    $("#test-textwrap").classList.remove("hidden");
+    $("#test-typed").value = "";
+    $("#test-correct").textContent = "";
+    $("#test-text-reveal").classList.add("hidden");
+    $("#test-text-grade").classList.add("hidden");
+    $("#test-text-show").classList.remove("hidden");
+    setTimeout(() => $("#test-typed").focus(), 30);
+  }
+}
+function classicAnswer(i) {
+  const c = state.classic;
+  if (c.locked) return;
+  c.locked = true;
+  revealAnswerButtons(c.queue[0].item.correctIndex, i);
+  $("#test-rating").classList.remove("hidden");
+}
+function classicRate(easy) {
+  const c = state.classic;
+  const e = c.queue.shift();
+  e.mode = easy ? "text" : "abcd";
+  insertAt(c.queue, 3, e);
+  renderClassic();
+}
+function classicTextShow() {
+  const e = state.classic.queue[0];
+  $("#test-correct").textContent = e.item.answers[e.item.correctIndex];
+  $("#test-text-reveal").classList.remove("hidden");
+  $("#test-text-show").classList.add("hidden");
+  $("#test-text-grade").classList.remove("hidden");
+}
+function classicTextGrade(kind) {
+  const c = state.classic;
+  const e = c.queue.shift();
+  if (kind === "pass") { c.passed++; persistProgress("classic", [{ card_key: testKey(e.item), passed: true }]); }
+  else { e.mode = kind === "hard" ? "abcd" : "text"; insertAt(c.queue, 3, e); }
+  renderClassic();
+}
+function finishClassic() {
+  const c = state.classic;
+  showResults({ pct: 100, title: "Quiz klasyczny — koniec", line: `Opanowano ${c.passed} z ${c.total}`, color: "var(--indigo)", wrong: [], onRetryWrong: null, onRetryAll: state.restart });
+}
+$("#btn-rate-hard").addEventListener("click", () => classicRate(false));
+$("#btn-rate-easy").addEventListener("click", () => classicRate(true));
+$("#btn-text-show").addEventListener("click", classicTextShow);
+$("#btn-text-pass").addEventListener("click", () => classicTextGrade("pass"));
+$("#btn-text-hard").addEventListener("click", () => classicTextGrade("hard"));
+$("#btn-text-easy").addEventListener("click", () => classicTextGrade("easy"));
 
-function renderFlashCard() {
-  const f = state.flash;
-  if (f.queue.length === 0) return finishFlash();
-  const card = f.queue[0];
-  f.flipped = false;
+// ════════════════════════════════════════════════════════════════════════════
+//  WSPÓLNY SILNIK OCEN (Fiszki / Nauka / Przegląd) — pokaż odpowiedź + 4 oceny
+// ════════════════════════════════════════════════════════════════════════════
+function startGrade(cards, cfg, shuffle, mode) {
+  const list = shuffle ? shuffled(cards) : cards.slice();
+  state.grade = { queue: list.map((c) => ({ front: c.front, back: c.back, key: c.key })), total: cards.length, done: 0, cfg, mode, revealed: false };
+  state.restart = () => startGrade(cards, cfg, shuffle, mode);
+  showScreen("screen-flash");
+  renderGrade();
+}
+function renderGrade() {
+  const g = state.grade;
+  if (g.queue.length === 0) return finishGrade();
+  const card = g.queue[0];
+  g.revealed = false;
   $("#flash-card").classList.remove("flipped");
   $("#flash-front-text").textContent = card.front;
   $("#flash-back-text").textContent = card.back;
-  $("#flash-count").textContent = `${f.known} / ${f.total}`;
-  $("#flash-known").textContent = `✓ ${f.known}`;
-  $("#flash-progress").style.width = `${(f.known / f.total) * 100}%`;
+  $("#flash-count").textContent = `${g.done} / ${g.total}`;
+  $("#flash-known").textContent = `✓ ${g.done}`;
+  $("#flash-progress").style.width = `${(g.done / g.total) * 100}%`;
   $("#flash-controls-front").classList.remove("hidden");
-  $("#flash-controls-grade").classList.add("hidden");
+  $("#flash-grades").classList.add("hidden");
 }
-
-function flipFlash() {
-  const f = state.flash;
-  if (f.queue.length === 0) return;
-  f.flipped = !f.flipped;
-  $("#flash-card").classList.toggle("flipped", f.flipped);
-  $("#flash-controls-front").classList.toggle("hidden", f.flipped);
-  $("#flash-controls-grade").classList.toggle("hidden", !f.flipped);
-}
-
-function gradeFlash(known) {
-  const f = state.flash;
-  if (f.queue.length === 0) return;
-  const card = f.queue.shift();
-  if (known) f.known++;
-  else f.queue.push(card);
-  renderFlashCard();
-}
-function skipFlash() { const f = state.flash; if (f.queue.length <= 1) return; f.queue.push(f.queue.shift()); renderFlashCard(); }
-function deleteFlashCard() { const f = state.flash; f.queue.shift(); f.total = Math.max(f.known, f.total - 1); if (f.queue.length === 0) return finishFlash(); renderFlashCard(); }
-
-function finishFlash() {
-  const f = state.flash;
-  const total = f.total || f.known;
-  const pct = total ? Math.round((f.known / total) * 100) : 100;
-  showResults({
-    pct, title: "Fiszki zakończone", line: `Opanowano ${f.known} ${plural(f.known, "fiszkę", "fiszki", "fiszek")}`,
-    color: "var(--amber)", wrong: [], onRetryWrong: null,
-    onRetryAll: () => startFlash(state.material.items, { shuffle: true, reverse: false }),
+function revealGrade() {
+  const g = state.grade;
+  if (!g || g.queue.length === 0 || g.revealed) return;
+  g.revealed = true;
+  $("#flash-card").classList.add("flipped");
+  $("#flash-controls-front").classList.add("hidden");
+  const box = $("#flash-grades");
+  box.innerHTML = "";
+  g.cfg.grades.forEach((gr) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-grade " + (gr.cls || "");
+    b.innerHTML = `<span class="g-label">${gr.label}</span><span class="g-hint">${gr.hint}</span>`;
+    b.addEventListener("click", () => applyGrade(gr));
+    box.appendChild(b);
   });
+  box.classList.remove("hidden");
 }
-
-$("#btn-flash-flip").addEventListener("click", flipFlash);
-$("#flash-card").addEventListener("click", flipFlash);
-$("#flash-card").addEventListener("keydown", (e) => { if (e.key === "Enter") flipFlash(); });
-$("#btn-flash-known").addEventListener("click", () => gradeFlash(true));
-$("#btn-flash-again").addEventListener("click", () => gradeFlash(false));
-$("#btn-flash-skip").addEventListener("click", skipFlash);
-$("#btn-flash-delete").addEventListener("click", deleteFlashCard);
+function applyGrade(gr) {
+  const g = state.grade;
+  const card = g.queue.shift();
+  if (gr.pos == null) {
+    g.done++;
+    if (g.mode && card.key) persistProgress(g.mode, [{ card_key: card.key, passed: true }]);
+  } else insertAt(g.queue, gr.pos, card);
+  renderGrade();
+}
+function skipGrade() { const g = state.grade; if (g.queue.length <= 1) return; g.queue.push(g.queue.shift()); renderGrade(); }
+function deleteGradeCard() { const g = state.grade; g.queue.shift(); g.total = Math.max(g.done, g.total - 1); if (g.queue.length === 0) return finishGrade(); renderGrade(); }
+function finishGrade() {
+  const g = state.grade;
+  const total = g.total || g.done;
+  const pct = total ? Math.round((g.done / total) * 100) : 100;
+  showResults({ pct, title: g.cfg.title + " — koniec", line: `Opanowano ${g.done} z ${total}`, color: g.cfg.color, wrong: [], onRetryWrong: null, onRetryAll: state.restart });
+}
+$("#btn-flash-flip").addEventListener("click", revealGrade);
+$("#flash-card").addEventListener("click", revealGrade);
+$("#flash-card").addEventListener("keydown", (e) => { if (e.key === "Enter") revealGrade(); });
+$("#btn-flash-skip").addEventListener("click", skipGrade);
+$("#btn-flash-delete").addEventListener("click", deleteGradeCard);
 $("#btn-flash-quit").addEventListener("click", () => showScreen("screen-library"));
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -536,7 +807,7 @@ function showResults({ pct, title, line, color, wrong, onRetryWrong, onRetryAll 
   const rw = $("#btn-retry-wrong");
   if (onRetryWrong) { rw.classList.remove("hidden"); rw.onclick = onRetryWrong; }
   else rw.classList.add("hidden");
-  $("#btn-retry-all").onclick = onRetryAll;
+  $("#btn-retry-all").onclick = onRetryAll || (() => showScreen("screen-library"));
   showScreen("screen-results");
 }
 $("#btn-results-home").addEventListener("click", () => { showScreen("screen-library"); loadMy(); });
@@ -545,17 +816,31 @@ $("#btn-results-home").addEventListener("click", () => { showScreen("screen-libr
 document.addEventListener("keydown", (e) => {
   const active = $(".screen.is-active")?.id;
   if (active === "screen-test") {
-    const t = state.test;
-    if (["1", "2", "3", "4"].includes(e.key) && !t.locked) {
-      const idx = Number(e.key) - 1;
-      if (idx < $$("#test-answers .answer").length) { e.preventDefault(); answerTest(idx); }
-    } else if (e.key === "Enter" && t.locked) { e.preventDefault(); nextTest(); }
-    else if (e.key.toLowerCase() === "s" && !t.locked) { e.preventDefault(); skipTest(); }
+    if (state.testScreenMode === "exam") {
+      const t = state.test;
+      if (["1", "2", "3", "4"].includes(e.key) && !t.locked) {
+        const idx = Number(e.key) - 1;
+        if (idx < $$("#test-answers .answer").length) { e.preventDefault(); answerExam(idx); }
+      } else if (e.key === "Enter" && t.locked) { e.preventDefault(); nextExam(); }
+      else if (e.key.toLowerCase() === "s" && !t.locked) { e.preventDefault(); skipExam(); }
+    } else if (state.testScreenMode === "classic") {
+      const c = state.classic;
+      const e0 = c.queue[0];
+      if (e0 && e0.mode === "abcd" && ["1", "2", "3", "4"].includes(e.key) && !c.locked) {
+        const idx = Number(e.key) - 1;
+        if (idx < $$("#test-answers .answer").length) { e.preventDefault(); classicAnswer(idx); }
+      } else if (e0 && e0.mode === "text" && e.key === "Enter" && $("#test-text-grade").classList.contains("hidden")) {
+        e.preventDefault(); classicTextShow();
+      }
+    }
   } else if (active === "screen-flash") {
-    const f = state.flash;
-    if (e.key === " ") { e.preventDefault(); flipFlash(); }
-    else if (f.flipped && e.key === "1") { e.preventDefault(); gradeFlash(false); }
-    else if (f.flipped && e.key === "2") { e.preventDefault(); gradeFlash(true); }
+    const g = state.grade;
+    if (!g) return;
+    if (e.key === " ") { e.preventDefault(); revealGrade(); }
+    else if (g.revealed && ["1", "2", "3", "4"].includes(e.key)) {
+      const idx = Number(e.key) - 1;
+      if (idx < g.cfg.grades.length) { e.preventDefault(); applyGrade(g.cfg.grades[idx]); }
+    }
   }
 });
 
