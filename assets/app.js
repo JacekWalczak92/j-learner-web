@@ -990,9 +990,15 @@ function finishGrade() {
   const pct = total ? Math.round((g.done / total) * 100) : 100;
   showResults({ pct, title: g.cfg.title + " — koniec", line: `Opanowano ${g.done} z ${total}`, color: g.cfg.color, wrong: [], onRetryWrong: null, onRetryAll: state.restart });
 }
+function flipGradeCard() {
+  const g = state.grade;
+  if (!g || g.queue.length === 0) return;
+  if (!g.revealed) { revealGrade(); return; }
+  $("#flash-card").classList.toggle("flipped");
+}
 $("#btn-flash-flip").addEventListener("click", revealGrade);
-$("#flash-card").addEventListener("click", revealGrade);
-$("#flash-card").addEventListener("keydown", (e) => { if (e.key === "Enter") revealGrade(); });
+$("#flash-card").addEventListener("click", flipGradeCard);
+$("#flash-card").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); flipGradeCard(); } });
 $("#btn-flash-skip").addEventListener("click", skipGrade);
 $("#btn-flash-delete").addEventListener("click", deleteGradeCard);
 $("#btn-flash-quit").addEventListener("click", () => showScreen("screen-library"));
@@ -1052,7 +1058,7 @@ document.addEventListener("keydown", (e) => {
   } else if (active === "screen-flash") {
     const g = state.grade;
     if (!g) return;
-    if (e.key === " ") { e.preventDefault(); revealGrade(); }
+    if (e.key === " ") { e.preventDefault(); flipGradeCard(); }
     else if (g.revealed && ["1", "2", "3", "4"].includes(e.key)) {
       const idx = Number(e.key) - 1;
       if (idx < g.cfg.grades.length) { e.preventDefault(); applyGrade(g.cfg.grades[idx]); }
