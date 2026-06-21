@@ -19,9 +19,31 @@ const state = {
   material: null,
   test: null,
   flash: null,
-  my: { folders: [], stack: [{ id: null, name: "Moje materiały" }], _dirty: true },
+  my: { folders: [], stack: [{ id: null, name: "Moje materiały" }], category: null, _dirty: true },
   editing: null,
 };
+
+const LIB_CATEGORIES = [
+  { key: "flashcards", type: "flashcards", name: "Fiszki", folderName: "Fiszki", icon: "❏", sub: "Foldery i materiały z fiszkami" },
+  { key: "test", type: "test", name: "Testy ABCD", folderName: "Testy ABCD", icon: "≡", sub: "Foldery i materiały z testami ABCD" },
+];
+const ROOT_STACK = { id: null, name: "Moje materiały" };
+
+function normName(v) { return String(v || "").trim().toLowerCase(); }
+function categoryByKey(key) { return LIB_CATEGORIES.find((c) => c.key === key) || null; }
+function categoryByType(type) { return LIB_CATEGORIES.find((c) => c.type === type) || null; }
+function isCategoryRootFolder(folder) {
+  return (folder.parent_id || null) === null && LIB_CATEGORIES.some((c) => normName(c.folderName) === normName(folder.name));
+}
+function getCategoryFolder(categoryKey) {
+  const cat = categoryByKey(categoryKey);
+  if (!cat) return null;
+  return state.my.folders.find((f) => (f.parent_id || null) === null && normName(f.name) === normName(cat.folderName)) || null;
+}
+function setRootLibraryView() {
+  state.my.category = null;
+  state.my.stack = [{ ...ROOT_STACK }];
+}
 
 function showScreen(id) {
   $$(".screen").forEach((s) => s.classList.toggle("is-active", s.id === id));
@@ -52,27 +74,31 @@ async function enterApp() {
   const u = DB.getUser();
   $("#user-email").textContent = u ? u.email : "";
   $("#user-box").classList.remove("hidden");
-  state.my.stack = [{ id: null, name: "Moje materiały" }];
+  setRootLibraryView();
   state.my._dirty = true;
   showScreen("screen-library");
   await seedDefaultFolders();
   switchTab("mine");
 }
 
-/** Tworzy domyślne foldery „Testy ABCD” i „Fiszki” — raz na użytkownika. */
+/** Zapewnia dwa główne katalogi-sekcje: „Fiszki” oraz „Testy ABCD”. */
 async function seedDefaultFolders() {
-  const u = DB.getUser();
-  if (!u) return;
-  const flag = "jl_seeded_" + u.id;
-  try { if (localStorage.getItem(flag)) return; } catch (_) {}
+  await ensureCategoryRootFolders();
+}
+
+async function ensureCategoryRootFolders() {
+  if (!DB.getUser()) return;
   try {
-    const folders = await DB.listFolders();
-    if (folders && folders.length === 0) {
-      await DB.createFolder("Testy ABCD", null);
-      await DB.createFolder("Fiszki", null);
+    let folders = (await DB.listFolders()) || [];
+    for (const cat of LIB_CATEGORIES) {
+      const exists = folders.some((f) => (f.parent_id || null) === null && normName(f.name) === normName(cat.folderName));
+      if (!exists) {
+        const created = await DB.createFolder(cat.folderName, null);
+        if (created) folders.push(created);
+      }
     }
-    try { localStorage.setItem(flag, "1"); } catch (_) {}
-    state.my._dirty = true;
+    state.my.folders = folders;
+    state.my._dirty = false;
   } catch (_) {}
 }
 
@@ -135,10 +161,26 @@ async function loadMy() {
   setLibStatus("Wczytuję…");
   try {
     if (state.my._dirty) { state.my.folders = (await DB.listFolders()) || []; state.my._dirty = false; }
+    if (LIB_CATEGORIES.some((cat) => !getCategoryFolder(cat.key))) await ensureCategoryRootFolders();
+
+    if (!state.my.category) {
+      renderMyCategories();
+      setLibStatus("");
+      return;
+    }
+
+    const cat = categoryByKey(state.my.category);
     const parent = curFolderId();
     const subfolders = state.my.folders.filter((f) => (f.parent_id || null) === parent);
-    const materials = (await DB.listMyMaterials(parent)) || [];
-    renderMy(subfolders, materials);
+    const isCategoryRoot = state.my.stack.length === 2;
+    const legacyRootFolders = isCategoryRoot
+      ? state.my.folders.filter((f) => (f.parent_id || null) === null && !isCategoryRootFolder(f))
+      : [];
+    const folders = subfolders.concat(legacyRootFolders);
+    const directMaterials = (await DB.listMyMaterials(parent)) || [];
+    const legacyRootMaterials = isCategoryRoot ? ((await DB.listMyMaterials(null)) || []) : [];
+    const materials = directMaterials.concat(legacyRootMaterials).filter((m) => m.type === cat.type);
+    renderMy(folders, materials);
     setLibStatus("");
   } catch (e) { setLibStatus(e.message, "err"); }
 }
@@ -156,8 +198,33 @@ function renderMyCrumbs() {
     const last = i === state.my.stack.length - 1;
     b.className = "crumb" + (last ? " current" : "");
     b.textContent = f.name;
-    if (!last) b.addEventListener("click", () => { state.my.stack = state.my.stack.slice(0, i + 1); loadMy(); });
+    if (!last) b.addEventListener("click", () => {
+      state.my.stack = state.my.stack.slice(0, i + 1);
+      state.my.category = state.my.stack.length > 1 ? state.my.stack[1].categoryKey : null;
+      loadMy();
+    });
     nav.appendChild(b);
+  });
+}
+
+function renderMyCategories() {
+  renderMyCrumbs();
+  const list = $("#my-list");
+  list.innerHTML = "";
+  $("#my-empty").classList.add("hidden");
+
+  LIB_CATEGORIES.forEach((cat) => {
+    const root = getCategoryFolder(cat.key);
+    const li = document.createElement("li");
+    const row = rowEl("category", cat.icon, cat.name, cat.sub);
+    row.querySelector(".lib-row").addEventListener("click", () => {
+      if (!root) return setLibStatus("Nie udało się odnaleźć sekcji. Odśwież stronę i spróbuj ponownie.", "err");
+      state.my.category = cat.key;
+      state.my.stack = [{ ...ROOT_STACK }, { id: root.id, name: cat.name, categoryKey: cat.key, isCategoryRoot: true }];
+      loadMy();
+    });
+    li.appendChild(row);
+    list.appendChild(li);
   });
 }
 
@@ -170,7 +237,7 @@ function renderMy(folders, materials) {
   folders.forEach((f) => {
     const li = document.createElement("li");
     const row = rowEl("folder", "▤", f.name, "Folder");
-    row.querySelector(".lib-row").addEventListener("click", () => { state.my.stack.push({ id: f.id, name: f.name }); loadMy(); });
+    row.querySelector(".lib-row").addEventListener("click", () => { state.my.stack.push({ id: f.id, name: f.name, categoryKey: state.my.category }); loadMy(); });
     row.appendChild(iconBtn("✕", "Usuń folder", async (e) => {
       e.stopPropagation();
       if (!confirm(`Usunąć folder „${f.name}" i jego zawartość?`)) return;
@@ -212,7 +279,13 @@ async function loadPublic() {
       row.querySelector(".lib-row").addEventListener("click", () => openMaterial(m.id));
       row.appendChild(iconBtn("⤓", "Kopiuj do moich", async (e) => {
         e.stopPropagation();
-        try { await DB.copyToMine(m.id, null); setLibStatus(`Skopiowano „${m.title}" do moich.`, "ok"); }
+        try {
+          await ensureCategoryRootFolders();
+          const cat = categoryByType(m.type);
+          const root = cat ? getCategoryFolder(cat.key) : null;
+          await DB.copyToMine(m.id, root ? root.id : null);
+          setLibStatus(`Skopiowano „${m.title}" do sekcji „${cat ? cat.name : "Moje materiały"}".`, "ok");
+        }
         catch (err) { setLibStatus(err.message, "err"); }
       }));
       li.appendChild(row);
@@ -247,12 +320,16 @@ function iconBtn(glyph, label, onClick) {
 }
 
 $("#btn-new-folder").addEventListener("click", async () => {
+  if (!state.my.category) return setLibStatus("Najpierw wybierz sekcję: Fiszki albo Testy ABCD.", "err");
   const name = (prompt("Nazwa folderu:") || "").trim();
   if (!name) return;
   try { await DB.createFolder(name, curFolderId()); state.my._dirty = true; loadMy(); }
   catch (e) { setLibStatus(e.message, "err"); }
 });
-$("#btn-new-material").addEventListener("click", () => editMaterial(null));
+$("#btn-new-material").addEventListener("click", () => {
+  if (!state.my.category) return setLibStatus("Najpierw wybierz sekcję: Fiszki albo Testy ABCD.", "err");
+  editMaterial(null);
+});
 
 // ════════════════════════════════════════════════════════════════════════════
 //  EDYTOR
@@ -263,7 +340,8 @@ function setEdStatus(msg, kind = "") {
 }
 
 async function editMaterial(id) {
-  state.editing = { id: id, folderId: curFolderId() };
+  const cat = categoryByKey(state.my.category);
+  state.editing = { id: id, folderId: curFolderId(), categoryKey: state.my.category };
   setEdStatus("");
   if (id) {
     $("#editor-title").textContent = "Edytuj materiał";
@@ -275,9 +353,9 @@ async function editMaterial(id) {
       $("#ed-content").value = m.content;
     } catch (e) { return setLibStatus(e.message, "err"); }
   } else {
-    $("#editor-title").textContent = "Nowy materiał";
+    $("#editor-title").textContent = cat ? `Nowy materiał — ${cat.name}` : "Nowy materiał";
     $("#ed-title").value = "";
-    $("#ed-type").value = "auto";
+    $("#ed-type").value = cat ? cat.type : "auto";
     $("#ed-content").value = "";
   }
   showScreen("screen-editor");
@@ -287,12 +365,16 @@ async function saveMaterial() {
   const title = $("#ed-title").value.trim();
   const content = $("#ed-content").value;
   let type = $("#ed-type").value;
+  const cat = state.editing ? categoryByKey(state.editing.categoryKey) : null;
   if (!title) return setEdStatus("Podaj tytuł.", "err");
   if (!content.trim()) return setEdStatus("Treść jest pusta.", "err");
   if (content.length > MAX_CONTENT_BYTES) return setEdStatus("Treść jest za duża (limit 5 MB).", "err");
-  if (type === "auto") type = JLP.detectMaterialType(content);
+  if (type === "auto") type = cat ? cat.type : JLP.detectMaterialType(content);
   if (type !== "test" && type !== "flashcards") {
     return setEdStatus("Nie rozpoznano formatu. Test: Q:/A:/B:/C:/D:/CORRECT: — Fiszki: przód;tył", "err");
+  }
+  if (cat && type !== cat.type) {
+    return setEdStatus(`Jesteś w sekcji „${cat.name}", więc materiał musi mieć zgodny typ.`, "err");
   }
   const items = type === "test" ? JLP.parseTestText(content) : JLP.parseFlashcardText(content);
   if (!items.length) return setEdStatus("Nie udało się odczytać żadnej pozycji z treści.", "err");

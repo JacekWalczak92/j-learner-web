@@ -79,12 +79,16 @@
 * { box-sizing: border-box; }
 
 html {
+  width: 100%;
   min-height: 100%;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
 }
 
 body {
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   min-height: 100vh;
   min-height: 100svh;
@@ -409,6 +413,8 @@ select.text-input {
 
 /* ── Przyciski ────────────────────────────────────────────────────────────── */
 .btn {
+  min-width: 0;
+  max-width: 100%;
   min-height: var(--tap);
   display: inline-flex;
   align-items: center;
@@ -484,6 +490,9 @@ select.text-input {
 /* ── Źródła / taby ────────────────────────────────────────────────────────── */
 .sources {
   position: sticky;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   top: calc(69px + env(safe-area-inset-top, 0px));
   z-index: 10;
   display: flex;
@@ -499,7 +508,8 @@ select.text-input {
 }
 
 .source-tab {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 44px;
   display: flex;
   align-items: center;
@@ -510,6 +520,9 @@ select.text-input {
   background: transparent;
   color: var(--muted);
   font-weight: 780;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
@@ -578,7 +591,7 @@ select.text-input {
 .crumb.current { color: var(--ink); cursor: default; background: var(--surface-2); }
 .crumb.current:hover { background: var(--surface-2); }
 .crumb-sep { color: var(--muted-2); }
-.lib-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.lib-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 
 .lib-list {
   list-style: none;
@@ -634,6 +647,7 @@ select.text-input {
   font-size: 1.06rem;
   font-weight: 800;
 }
+.lib-ico.category { background: linear-gradient(135deg, var(--indigo-soft), var(--amber-soft)); color: var(--ink); }
 .lib-ico.folder { background: var(--amber-soft); color: var(--amber); }
 .lib-ico.file { background: var(--indigo-soft); color: var(--indigo); }
 .lib-row-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -1162,7 +1176,7 @@ select.text-input {
   :root { --radius: 20px; --radius-md: 16px; }
   .brand-sub { display: none; }
   .auth-actions { flex-direction: column; }
-  .source-tab { min-height: 42px; padding-inline: 8px; }
+  .source-tab { min-height: 42px; padding-inline: 4px; font-size: 0.78rem; }
   .lib-actions { grid-template-columns: 1fr; }
   .row-action { flex-basis: 40px; width: 40px; }
   .qcard,
@@ -1171,6 +1185,77 @@ select.text-input {
   .answer { padding: 12px; }
   .flash-inner { min-height: 300px; }
   .grade-controls .btn-grade { min-width: 100%; }
+}
+
+
+@media (max-width: 680px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .topbar,
+  .main,
+  .footer,
+  .screen,
+  .sources,
+  .lib-bar,
+  .lib-browser,
+  .lib-auth,
+  .lib-gate,
+  .ready,
+  .qcard,
+  .results-card,
+  .session-bar {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .btn {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .btn-sm {
+    min-height: 40px;
+    padding: 9px 11px;
+    font-size: 0.84rem;
+  }
+
+  .sources {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .source-tab {
+    white-space: nowrap;
+    min-width: 0;
+    padding-inline: 6px;
+    font-size: clamp(0.78rem, 3.35vw, 0.9rem);
+  }
+
+  .source-ico { display: none; }
+
+  .lib-crumbs,
+  .lib-row-main,
+  .ready-meta,
+  .mode-meta,
+  .opt-text {
+    min-width: 0;
+  }
+
+  .lib-name,
+  .ready-title {
+    max-width: 100%;
+  }
+
+  .lib-sub,
+  .mode-desc,
+  .opt-text small {
+    overflow-wrap: anywhere;
+  }
 }
 
 @media (hover: none) {
