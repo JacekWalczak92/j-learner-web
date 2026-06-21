@@ -929,6 +929,31 @@ select.text-input {
 .answer.wrong { border-color: rgba(255, 107, 89, 0.72); background: var(--bad-soft); }
 .answer.wrong .answer-key { background: var(--bad); color: #fff; }
 
+/* ── Wielokrotny wybór ─────────────────────────────────────────────────────── */
+.answers.multi .answer-key { border-radius: 8px; }
+.answer.selected { border-color: rgba(124, 108, 255, 0.75); background: var(--indigo-soft); }
+.answer.selected .answer-key { background: var(--indigo); color: #fff; }
+.answer.correct.missed { border-style: dashed; }
+.answer.correct.missed::after {
+  content: "pominięta";
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--ok);
+  letter-spacing: 0.02em;
+}
+.multi-badge {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #cfc4ff;
+  background: rgba(124, 108, 255, 0.16);
+  border: 1px solid rgba(124, 108, 255, 0.32);
+}
+
 .session-controls {
   align-items: center;
   margin-top: 18px;

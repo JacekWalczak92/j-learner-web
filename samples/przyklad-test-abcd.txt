@@ -18,3 +18,10 @@ B: Spójność i powtarzalność pomiaru
 C: Liczbę pozycji testowych
 D: Normy stenowe
 CORRECT: B
+
+Q: Które z poniższych są technikami badań jakościowych?
+A: Wywiad pogłębiony
+B: Eksperyment laboratoryjny
+C: Obserwacja uczestnicząca
+D: Analiza regresji
+CORRECT: A, C

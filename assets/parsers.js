@@ -9,6 +9,7 @@
 //      C: odpowiedź C
 //      D: odpowiedź D
 //      CORRECT: A          (litera A/B/C/D — poprawna odpowiedź)
+//      CORRECT: A, C        (kilka liter — pytanie wielokrotnego wyboru)
 //
 //  FISZKI (jedna fiszka = jedna linia):
 //      przód;tył              (średnik; albo tabulator)
@@ -26,8 +27,31 @@ function stripPrefix(line, letter) {
 }
 
 /**
+ * Zamienia treść linii CORRECT ("A", "A,C", "A C", "AC", "A; D") na posortowaną
+ * listę indeksów 0..3. Pojedyncza litera → lista jednoelementowa (kompatybilność wstecz).
+ * @returns {number[]}
+ */
+function parseCorrectIndices(raw) {
+  const map = { A: 0, B: 1, C: 2, D: 3 };
+  const out = [];
+  for (const token of String(raw).toUpperCase().split(/[\s,;/|]+/)) {
+    for (const ch of token) {
+      if (ch in map && !out.includes(map[ch])) out.push(map[ch]);
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** Wszystkie poprawne odpowiedzi pytania połączone przecinkiem (Fiszki, podsumowania). */
+function correctAnswersText(q) {
+  const idxs = q.correctIndices && q.correctIndices.length ? q.correctIndices : [q.correctIndex];
+  return idxs.map((i) => q.answers[i]).filter((x) => x != null && x !== "").join(", ");
+}
+
+/**
  * Parsuje tekst w formacie Q:/A:/B:/C:/D:/CORRECT: na listę pytań.
- * @returns {Array<{question:string, answers:string[], correctIndex:number}>}
+ * CORRECT może zawierać kilka liter (np. "A, C") — wtedy pytanie ma wiele poprawnych.
+ * @returns {Array<{question:string, answers:string[], correctIndex:number, correctIndices:number[]}>}
  */
 function parseTestText(text) {
   const questions = [];
@@ -56,10 +80,11 @@ function parseTestText(text) {
       const c = stripPrefix(cLine, "C");
       const d = stripPrefix(dLine, "D");
       const correct = stripPrefix(correctLine, "CORRECT").toUpperCase();
-      const correctIndex =
-        correct === "A" ? 0 : correct === "B" ? 1 : correct === "C" ? 2 : correct === "D" ? 3 : 0;
+      const idx = parseCorrectIndices(correct);
+      const correctIndices = idx.length ? idx : [0];
+      const correctIndex = correctIndices[0];
       if (question && a) {
-        questions.push({ question, answers: [a, b, c, d], correctIndex });
+        questions.push({ question, answers: [a, b, c, d], correctIndex, correctIndices });
       }
       i += 6;
     } else {
@@ -135,4 +160,6 @@ window.JLParsers = {
   parseTestText,
   parseFlashcardText,
   detectMaterialType,
+  parseCorrectIndices,
+  correctAnswersText,
 };

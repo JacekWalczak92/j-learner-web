@@ -75,6 +75,11 @@ D: odpowiedź D
 CORRECT: B
 ```
 
+Linia `CORRECT:` może wskazywać kilka poprawnych odpowiedzi — wtedy pytanie staje się
+wielokrotnego wyboru (np. `CORRECT: A, C`; akceptowane też `A C` lub `AC`). W sesji
+takie pytanie pokazuje checkboxy i przycisk **Sprawdź**; zalicza się tylko przy zaznaczeniu
+wszystkich poprawnych (i żadnej błędnej).
+
 **Fiszki** (jedna na linię): `przód;tył` (opcjonalnie `;tagi`). Przykłady: `samples/`.
 
 ## Struktura plików

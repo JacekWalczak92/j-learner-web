@@ -504,7 +504,7 @@ async function saveMaterial() {
   if (content.length > MAX_CONTENT_BYTES) return setEdStatus("Treść jest za duża (limit 5 MB).", "err");
   if (type === "auto") type = cat ? cat.type : JLP.detectMaterialType(content);
   if (type !== "test" && type !== "flashcards") {
-    return setEdStatus("Nie rozpoznano formatu. Test: Q:/A:/B:/C:/D:/CORRECT: — Fiszki: przód;tył", "err");
+    return setEdStatus("Nie rozpoznano formatu. Test: Q:/A:/B:/C:/D:/CORRECT: (kilka poprawnych: CORRECT: A, C) — Fiszki: przód;tył", "err");
   }
   if (cat && type !== cat.type) {
     return setEdStatus(`Jesteś w sekcji „${cat.name}", więc materiał musi mieć zgodny typ.`, "err");
@@ -562,8 +562,10 @@ function renderReady() {
   $("#ready-badge").textContent = isTest ? "TEST ABCD" : "FISZKI";
   $("#ready-badge").className = "badge" + (isTest ? "" : " cards");
   $("#ready-title").textContent = mat.name;
+  const multiCount = isTest ? mat.items.filter((q) => isMultiQ(q)).length : 0;
   $("#ready-count").textContent = isTest
-    ? `${mat.items.length} ${plural(mat.items.length, "pytanie", "pytania", "pytań")}`
+    ? `${mat.items.length} ${plural(mat.items.length, "pytanie", "pytania", "pytań")}` +
+      (multiCount ? ` · ${multiCount} ☑ wielokrotne` : "")
     : `${mat.items.length} ${plural(mat.items.length, "fiszka", "fiszki", "fiszek")}`;
 
   const modes = isTest ? TEST_MODES : FLASH_MODES;
@@ -739,7 +741,7 @@ $("#btn-start").addEventListener("click", () => {
     if (state.mode === "exam") startExam(remaining, { shuffleQ: sq, shuffleA: sa });
     else startClassic(remaining, { shuffleQ: sq, shuffleA: sa });
   } else if (state.mode === "tflash") {
-    const cards = mat.items.map((q) => ({ front: q.question, back: q.answers[q.correctIndex], key: testKey(q) }));
+    const cards = mat.items.map((q) => ({ front: q.question, back: JLP.correctAnswersText(q), key: testKey(q) }));
     const remaining = cards.filter((c) => !passed.has(c.key));
     if (!remaining.length) return allDoneNotice();
     startGrade(remaining, GRADE_CFG.tflash, sq, "flash");
@@ -767,27 +769,64 @@ function insertAt(arr, pos, item) { arr.splice(Math.min(pos, arr.length), 0, ite
 
 function prepareItems(items, shuffleA) {
   return items.map((q) => {
-    let arr = q.answers.map((text, idx) => ({ text, correct: idx === q.correctIndex }));
+    const baseCorrect = q.correctIndices && q.correctIndices.length ? q.correctIndices : [q.correctIndex];
+    const correctSet = new Set(baseCorrect);
+    let arr = q.answers.map((text, idx) => ({ text, correct: correctSet.has(idx) }));
     if (shuffleA) arr = shuffled(arr);
-    return { question: q.question, answers: arr.map((a) => a.text), correctIndex: arr.findIndex((a) => a.correct), key: q.key };
+    const correctIndices = arr.map((a, i) => (a.correct ? i : -1)).filter((i) => i >= 0);
+    return {
+      question: q.question,
+      answers: arr.map((a) => a.text),
+      correctIndex: correctIndices.length ? correctIndices[0] : 0,
+      correctIndices,
+      key: q.key,
+    };
   });
 }
-function buildAnswers(box, answers, handler) {
+/** Czy pytanie ma więcej niż jedną poprawną odpowiedź. */
+function isMultiQ(q) { return !!(q && q.correctIndices && q.correctIndices.length > 1); }
+/** Zbiór zaznaczonych indeksów odpowiedzi (tryb wielokrotnego wyboru). */
+function selectedIdxSet() {
+  return new Set($$("#test-answers .answer.selected").map((b) => Number(b.dataset.idx)));
+}
+function toggleAnswerByIdx(i) {
+  const b = $(`#test-answers .answer[data-idx="${i}"]`);
+  if (!b || b.disabled) return;
+  b.classList.toggle("selected");
+  const btn = $("#btn-test-check");
+  if (btn) btn.disabled = $$("#test-answers .answer.selected").length === 0;
+}
+function setMultiBadge(on) { $("#test-multi-badge").classList.toggle("hidden", !on); }
+function showCheckBtn(on) {
+  $("#test-check").classList.toggle("hidden", !on);
+  if (on) $("#btn-test-check").disabled = true;
+}
+function buildAnswers(box, answers, handler, opts) {
+  const multi = !!(opts && opts.multi);
   const keys = ["A", "B", "C", "D"];
   box.innerHTML = "";
+  box.classList.toggle("multi", multi);
   answers.forEach((text, i) => {
     const b = document.createElement("button");
     b.className = "answer"; b.type = "button";
+    b.dataset.idx = String(i);
     b.innerHTML = `<span class="answer-key">${keys[i] || i + 1}</span><span>${escapeHtml(text)}</span>`;
-    b.addEventListener("click", () => handler(i));
+    b.addEventListener("click", () => handler(i, b));
     box.appendChild(b);
   });
 }
-function revealAnswerButtons(correctIndex, chosen) {
+function revealAnswerButtons(correctIndices, chosen) {
+  const correct = new Set(Array.isArray(correctIndices) ? correctIndices : [correctIndices]);
+  const chosenSet = chosen instanceof Set ? chosen : new Set(chosen == null ? [] : [chosen]);
   $$("#test-answers .answer").forEach((b, idx) => {
     b.disabled = true;
-    if (idx === correctIndex) b.classList.add("correct");
-    else if (idx === chosen) b.classList.add("wrong");
+    b.classList.remove("selected");
+    if (correct.has(idx)) {
+      b.classList.add("correct");
+      if (!chosenSet.has(idx)) b.classList.add("missed");
+    } else if (chosenSet.has(idx)) {
+      b.classList.add("wrong");
+    }
   });
 }
 
@@ -816,15 +855,35 @@ function renderExam() {
   $("#test-score").textContent = `✓ ${t.correct}`;
   $("#test-progress").style.width = `${(t.pos / t.total) * 100}%`;
   $("#btn-test-next").disabled = true;
-  buildAnswers($("#test-answers"), q.answers, answerExam);
+  const multi = isMultiQ(q);
+  setMultiBadge(multi);
+  showCheckBtn(multi);
+  buildAnswers($("#test-answers"), q.answers, answerExam, { multi });
 }
 function answerExam(i) {
   const t = state.test;
   if (t.locked) return;
-  t.locked = true;
   const q = t.queue[t.pos];
-  revealAnswerButtons(q.correctIndex, i);
+  if (isMultiQ(q)) { toggleAnswerByIdx(i); return; }
+  t.locked = true;
+  revealAnswerButtons(q.correctIndices, new Set([i]));
   if (i === q.correctIndex) { t.correct++; $("#test-score").textContent = `✓ ${t.correct}`; }
+  else t.wrong.push(q);
+  $("#btn-test-next").disabled = false;
+  $("#btn-test-next").focus();
+}
+function checkExam() {
+  const t = state.test;
+  if (t.locked) return;
+  const q = t.queue[t.pos];
+  const chosen = selectedIdxSet();
+  if (chosen.size === 0) return;
+  t.locked = true;
+  revealAnswerButtons(q.correctIndices, chosen);
+  showCheckBtn(false);
+  const correctSet = new Set(q.correctIndices);
+  const ok = chosen.size === correctSet.size && [...chosen].every((x) => correctSet.has(x));
+  if (ok) { t.correct++; $("#test-score").textContent = `✓ ${t.correct}`; }
   else t.wrong.push(q);
   $("#btn-test-next").disabled = false;
   $("#btn-test-next").focus();
@@ -841,8 +900,8 @@ function finishExam() {
   const retry = t.wrong.slice();
   showResults({
     pct, title: "Sesja testowa — koniec", line: `${t.correct} / ${t.total} poprawnych odpowiedzi`, color: "var(--indigo)",
-    wrong: retry.map((q) => ({ question: q.question, answer: q.answers[q.correctIndex] || "" })),
-    onRetryWrong: retry.length ? () => startExam(retry.map((q) => ({ question: q.question, answers: q.answers, correctIndex: q.correctIndex })), { shuffleQ: true, shuffleA: true }) : null,
+    wrong: retry.map((q) => ({ question: q.question, answer: JLP.correctAnswersText(q) })),
+    onRetryWrong: retry.length ? () => startExam(retry.map((q) => ({ question: q.question, answers: q.answers, correctIndex: q.correctIndex, correctIndices: q.correctIndices })), { shuffleQ: true, shuffleA: true }) : null,
     onRetryAll: state.restart,
   });
 }
@@ -850,6 +909,10 @@ $("#btn-test-next").addEventListener("click", nextExam);
 $("#btn-test-skip").addEventListener("click", skipExam);
 $("#btn-test-delete").addEventListener("click", deleteExam);
 $("#btn-test-quit").addEventListener("click", () => showScreen("screen-library"));
+$("#btn-test-check").addEventListener("click", () => {
+  if (state.testScreenMode === "exam") checkExam();
+  else if (state.testScreenMode === "classic") checkClassic();
+});
 
 // ════════════════════════════════════════════════════════════════════════════
 //  TRYB: QUIZ KLASYCZNY (CLASSIC) — ABCD + wpisywanie z pamięci, aż opanujesz
@@ -875,10 +938,15 @@ function renderClassic() {
   $("#test-controls").classList.add("hidden");
   $("#test-rating").classList.add("hidden");
   if (e.mode === "abcd") {
+    const multi = isMultiQ(e.item);
     $("#test-textwrap").classList.add("hidden");
     $("#test-answers").classList.remove("hidden");
-    buildAnswers($("#test-answers"), e.item.answers, classicAnswer);
+    setMultiBadge(multi);
+    showCheckBtn(multi);
+    buildAnswers($("#test-answers"), e.item.answers, classicAnswer, { multi });
   } else {
+    setMultiBadge(false);
+    showCheckBtn(false);
     $("#test-answers").classList.add("hidden");
     $("#test-textwrap").classList.remove("hidden");
     $("#test-typed").value = "";
@@ -892,14 +960,28 @@ function renderClassic() {
 function classicAnswer(i) {
   const c = state.classic;
   if (c.locked) return;
+  const q = c.queue[0].item;
+  if (isMultiQ(q)) { toggleAnswerByIdx(i); return; }
   c.locked = true;
-  revealAnswerButtons(c.queue[0].item.correctIndex, i);
+  revealAnswerButtons(q.correctIndices, new Set([i]));
+  $("#test-rating").classList.remove("hidden");
+}
+function checkClassic() {
+  const c = state.classic;
+  if (c.locked) return;
+  const q = c.queue[0].item;
+  const chosen = selectedIdxSet();
+  if (chosen.size === 0) return;
+  c.locked = true;
+  revealAnswerButtons(q.correctIndices, chosen);
+  showCheckBtn(false);
   $("#test-rating").classList.remove("hidden");
 }
 function classicRate(easy) {
   const c = state.classic;
   const e = c.queue.shift();
-  e.mode = easy ? "text" : "abcd";
+  // Pytania wielokrotnego wyboru zawsze wracają jako ABCD (bez wpisywania z pamięci).
+  e.mode = (easy && !isMultiQ(e.item)) ? "text" : "abcd";
   insertAt(c.queue, 3, e);
   renderClassic();
 }
@@ -1079,10 +1161,12 @@ document.addEventListener("keydown", (e) => {
   if (active === "screen-test") {
     if (state.testScreenMode === "exam") {
       const t = state.test;
+      const cur = t.queue[t.pos];
       if (["1", "2", "3", "4"].includes(e.key) && !t.locked) {
         const idx = Number(e.key) - 1;
         if (idx < $$("#test-answers .answer").length) { e.preventDefault(); answerExam(idx); }
       } else if (e.key === "Enter" && t.locked) { e.preventDefault(); nextExam(); }
+      else if (e.key === "Enter" && !t.locked && isMultiQ(cur)) { e.preventDefault(); checkExam(); }
       else if (e.key.toLowerCase() === "s" && !t.locked) { e.preventDefault(); skipExam(); }
     } else if (state.testScreenMode === "classic") {
       const c = state.classic;
@@ -1090,6 +1174,8 @@ document.addEventListener("keydown", (e) => {
       if (e0 && e0.mode === "abcd" && ["1", "2", "3", "4"].includes(e.key) && !c.locked) {
         const idx = Number(e.key) - 1;
         if (idx < $$("#test-answers .answer").length) { e.preventDefault(); classicAnswer(idx); }
+      } else if (e0 && e0.mode === "abcd" && e.key === "Enter" && !c.locked && isMultiQ(e0.item)) {
+        e.preventDefault(); checkClassic();
       } else if (e0 && e0.mode === "text" && e.key === "Enter" && $("#test-text-grade").classList.contains("hidden")) {
         e.preventDefault(); classicTextShow();
       }
@@ -1133,7 +1219,14 @@ A: zależna
 B: zakłócająca
 C: niezależna
 D: pośrednicząca
-CORRECT: C`;
+CORRECT: C
+
+Q: Które z poniższych są miarami tendencji centralnej?
+A: Średnia
+B: Wariancja
+C: Mediana
+D: Odchylenie standardowe
+CORRECT: A, C`;
 
 const SAMPLE_CARDS = `bodziec warunkowy;bodziec, który po skojarzeniu wywołuje reakcję warunkową;warunkowanie
 walidacja;stopień, w jakim test mierzy to, co ma mierzyć;psychometria
