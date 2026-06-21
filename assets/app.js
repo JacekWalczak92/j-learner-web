@@ -597,7 +597,7 @@ async function loadModeProgress(mode) {
   const line = $("#ready-progress");
   const resetBtn = $("#btn-reset-progress");
   state.ready = { mode, passed: new Set() };
-  if (!DB.isConfigured() || !state.material.id) { line.textContent = ""; resetBtn.classList.add("hidden"); return; }
+  if (mode === "przeglad" || !DB.isConfigured() || !state.material.id) { line.textContent = ""; line.classList.remove("done"); resetBtn.classList.add("hidden"); return; }
   line.textContent = "Ładuję postęp…";
   try {
     const rows = await DB.listProgress(state.material.id, mode);
@@ -643,7 +643,7 @@ const TEST_MODES = [
 ];
 const FLASH_MODES = [
   { key: "nauka", icon: "📚", label: "Nauka", desc: "Przerabiasz całość; karta wraca, dopóki nie klikniesz „Łatwe”." },
-  { key: "przeglad", icon: "🔁", label: "Przegląd", desc: "Szybka powtórka; „Dobre” lub „Łatwe” kończy kartę." },
+  { key: "przeglad", icon: "🔁", label: "Przegląd", desc: "Przeglądasz karty: następna / poprzednia, z odwracaniem. Bez ocen." },
 ];
 
 const GRADE_CFG = {
@@ -657,12 +657,6 @@ const GRADE_CFG = {
     { label: "Powtórz", hint: "za 1", pos: 1, cls: "g-again" },
     { label: "Trudne", hint: "za 3", pos: 3, cls: "g-hard" },
     { label: "Dobre", hint: "za 6", pos: 6, cls: "g-good" },
-    { label: "Łatwe", hint: "koniec", pos: null, cls: "g-easy" },
-  ] },
-  przeglad: { title: "Przegląd", color: "var(--amber)", grades: [
-    { label: "Powtórz", hint: "za 1", pos: 1, cls: "g-again" },
-    { label: "Trudne", hint: "za 2", pos: 2, cls: "g-hard" },
-    { label: "Dobre", hint: "koniec", pos: null, cls: "g-good" },
     { label: "Łatwe", hint: "koniec", pos: null, cls: "g-easy" },
   ] },
 };
@@ -697,7 +691,6 @@ const RESET_GROUPS = {
   ],
   flashcards: [
     { label: "Nauka", mode: "nauka" },
-    { label: "Przegląd", mode: "przeglad" },
     { label: "Wszystko", mode: null, danger: true },
   ],
 };
@@ -750,11 +743,15 @@ $("#btn-start").addEventListener("click", () => {
     const remaining = cards.filter((c) => !passed.has(c.key));
     if (!remaining.length) return allDoneNotice();
     startGrade(remaining, GRADE_CFG.tflash, sq, "flash");
-  } else {
+  } else if (state.mode === "nauka") {
     const cards = mat.items.map((c) => { const key = flashKey(c); return rev ? { front: c.back, back: c.front, key } : { front: c.front, back: c.back, key }; });
     const remaining = cards.filter((c) => !passed.has(c.key));
     if (!remaining.length) return allDoneNotice();
-    startGrade(remaining, GRADE_CFG[state.mode], sc, state.mode);
+    startGrade(remaining, GRADE_CFG.nauka, sc, "nauka");
+  } else {
+    // Przegląd — zwykłe przeglądanie kart: następna / poprzednia, bez ocen
+    const cards = mat.items.map((c) => (rev ? { front: c.back, back: c.front } : { front: c.front, back: c.back }));
+    startBrowse(cards, { shuffle: sc });
   }
 });
 
@@ -936,6 +933,8 @@ $("#btn-text-easy").addEventListener("click", () => classicTextGrade("easy"));
 // ════════════════════════════════════════════════════════════════════════════
 function startGrade(cards, cfg, shuffle, mode) {
   const list = shuffle ? shuffled(cards) : cards.slice();
+  state.flashMode = "grade";
+  state.browse = null;
   state.grade = { queue: list.map((c) => ({ front: c.front, back: c.back, key: c.key })), total: cards.length, done: 0, cfg, mode, revealed: false };
   state.restart = () => startGrade(cards, cfg, shuffle, mode);
   showScreen("screen-flash");
@@ -951,7 +950,9 @@ function renderGrade() {
   $("#flash-back-text").textContent = card.back;
   $("#flash-count").textContent = `${g.done} / ${g.total}`;
   $("#flash-known").textContent = `✓ ${g.done}`;
+  $("#flash-known").classList.remove("hidden");
   $("#flash-progress").style.width = `${(g.done / g.total) * 100}%`;
+  $("#flash-browse").classList.add("hidden");
   $("#flash-controls-front").classList.remove("hidden");
   $("#flash-grades").classList.add("hidden");
 }
@@ -996,9 +997,47 @@ function flipGradeCard() {
   if (!g.revealed) { revealGrade(); return; }
   $("#flash-card").classList.toggle("flipped");
 }
+
+// ── Tryb PRZEGLĄD — przeglądanie kart bez ocen (następna / poprzednia) ───────
+function startBrowse(cards, { shuffle = true } = {}) {
+  const list = shuffle ? shuffled(cards) : cards.slice();
+  state.flashMode = "browse";
+  state.grade = null;
+  state.browse = { cards: list, idx: 0, flipped: false };
+  state.restart = () => startBrowse(cards, { shuffle });
+  showScreen("screen-flash");
+  renderBrowse();
+}
+function renderBrowse() {
+  const s = state.browse;
+  const c = s.cards[s.idx];
+  $("#flash-card").classList.toggle("flipped", s.flipped);
+  $("#flash-front-text").textContent = c.front;
+  $("#flash-back-text").textContent = c.back;
+  $("#flash-count").textContent = `${s.idx + 1} / ${s.cards.length}`;
+  $("#flash-known").textContent = "🔁 Przegląd";
+  $("#flash-known").classList.remove("hidden");
+  $("#flash-progress").style.width = `${((s.idx + 1) / s.cards.length) * 100}%`;
+  $("#flash-controls-front").classList.add("hidden");
+  $("#flash-grades").classList.add("hidden");
+  $("#flash-browse").classList.remove("hidden");
+  $("#btn-flash-prev").disabled = s.idx === 0;
+  $("#btn-flash-next").disabled = s.idx === s.cards.length - 1;
+}
+function browseFlip() { const s = state.browse; if (!s) return; s.flipped = !s.flipped; $("#flash-card").classList.toggle("flipped", s.flipped); }
+function browseNext() { const s = state.browse; if (s && s.idx < s.cards.length - 1) { s.idx++; s.flipped = false; renderBrowse(); } }
+function browsePrev() { const s = state.browse; if (s && s.idx > 0) { s.idx--; s.flipped = false; renderBrowse(); } }
+
+function onFlashCardActivate() {
+  if (state.flashMode === "browse") browseFlip();
+  else flipGradeCard();
+}
 $("#btn-flash-flip").addEventListener("click", revealGrade);
-$("#flash-card").addEventListener("click", flipGradeCard);
-$("#flash-card").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); flipGradeCard(); } });
+$("#flash-card").addEventListener("click", onFlashCardActivate);
+$("#flash-card").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); onFlashCardActivate(); } });
+$("#btn-flash-flip2").addEventListener("click", browseFlip);
+$("#btn-flash-prev").addEventListener("click", browsePrev);
+$("#btn-flash-next").addEventListener("click", browseNext);
 $("#btn-flash-skip").addEventListener("click", skipGrade);
 $("#btn-flash-delete").addEventListener("click", deleteGradeCard);
 $("#btn-flash-quit").addEventListener("click", () => showScreen("screen-library"));
@@ -1056,6 +1095,13 @@ document.addEventListener("keydown", (e) => {
       }
     }
   } else if (active === "screen-flash") {
+    if (state.flashMode === "browse") {
+      if (!state.browse) return;
+      if (e.key === " ") { e.preventDefault(); browseFlip(); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); browseNext(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); browsePrev(); }
+      return;
+    }
     const g = state.grade;
     if (!g) return;
     if (e.key === " ") { e.preventDefault(); flipGradeCard(); }

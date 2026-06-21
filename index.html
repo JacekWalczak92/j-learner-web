@@ -10,7 +10,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#16181d" />
   <title>J-Learner</title>
-  <link rel="stylesheet" href="assets/styles.css?v=4" />
+  <link rel="stylesheet" href="assets/styles.css?v=5" />
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
@@ -205,6 +205,11 @@
       </div>
       <div id="flash-controls-grade" class="hidden"></div>
       <div id="flash-grades" class="session-controls grade-controls hidden"></div>
+      <div id="flash-browse" class="session-controls hidden">
+        <button id="btn-flash-prev" class="btn btn-ghost" type="button">← Poprzednia</button>
+        <button id="btn-flash-flip2" class="btn btn-primary" type="button">Odwróć</button>
+        <button id="btn-flash-next" class="btn btn-ghost" type="button">Następna →</button>
+      </div>
       <p class="kbd-hint"><span class="kbd">Spacja</span> odwróć &middot; <span class="kbd">1</span>–<span class="kbd">4</span> ocena</p>
       <div class="session-controls"><button id="btn-flash-quit" class="btn btn-link" type="button">Zakończ i wróć</button></div>
     </section>
@@ -236,9 +241,9 @@
     </div>
   </div>
 
-  <script src="assets/config.js?v=4"></script>
-  <script src="assets/parsers.js?v=4"></script>
-  <script src="assets/supabase.js?v=4"></script>
-  <script src="assets/app.js?v=4"></script>
+  <script src="assets/config.js?v=5"></script>
+  <script src="assets/parsers.js?v=5"></script>
+  <script src="assets/supabase.js?v=5"></script>
+  <script src="assets/app.js?v=5"></script>
 </body>
 </html>
