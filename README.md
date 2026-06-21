@@ -9,6 +9,7 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
 - **Konta** (e-mail + hasło) — logowanie i rejestracja.
 - **Moje materiały** — foldery (zagnieżdżone), tworzenie/edycja/usuwanie testów i fiszek,
   wbudowany edytor z wykrywaniem formatu, import z pliku. Nowe konto dostaje dwa
+- **Przenoszenie materiałów** — każdy zestaw można przenieść do innego folderu w tej samej sekcji lub usunąć z folderu (przycisk ↪ w wierszu materiału → wybór folderu / „góra sekcji”).
   domyślne foldery: **Testy ABCD** i **Fiszki**.
 - **Od autora** — publiczne materiały, które publikujesz; każdy może je otworzyć lub
   „skopiować do moich".

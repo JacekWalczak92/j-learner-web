@@ -59,6 +59,8 @@
       </div>
 
       <div id="tab-mine">
+        <div id="my-category-tabs" class="category-tabs" role="tablist" aria-label="Typ materiałów"></div>
+
         <div class="lib-bar">
           <nav id="my-crumbs" class="lib-crumbs" aria-label="Foldery"></nav>
           <div class="lib-actions">
@@ -221,6 +223,14 @@
   </main>
 
   <footer class="footer"><span>J-Learner — Twoja biblioteka fiszek i testów.</span></footer>
+
+  <div id="modal-overlay" class="modal-overlay hidden" role="presentation">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title" class="modal-title"></h3>
+      <div id="modal-body" class="modal-body"></div>
+      <div class="modal-actions"><button id="modal-close" class="btn btn-ghost" type="button">Zamknij</button></div>
+    </div>
+  </div>
 
   <script src="assets/config.js"></script>
   <script src="assets/parsers.js"></script>

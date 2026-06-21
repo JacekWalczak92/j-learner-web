@@ -169,6 +169,10 @@ function updateMaterial(id, patch) {
 function deleteMaterial(id) {
   return rest("/materials?id=eq." + encodeURIComponent(id), { method: "DELETE" });
 }
+/** Przenosi materiał do folderu (folderId=null → poza folder / korzeń). */
+function moveMaterial(id, folderId) {
+  return updateMaterial(id, { folder_id: folderId || null });
+}
 /** Kopiuje materiał (np. publiczny „od autora") do moich. */
 async function copyToMine(id, folderId) {
   const m = await getMaterial(id);
@@ -223,6 +227,7 @@ window.JLDB = {
   createMaterial,
   updateMaterial,
   deleteMaterial,
+  moveMaterial,
   copyToMine,
   listProgress,
   upsertProgress,

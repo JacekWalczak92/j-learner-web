@@ -40,6 +40,14 @@ function getCategoryFolder(categoryKey) {
   if (!cat) return null;
   return state.my.folders.find((f) => (f.parent_id || null) === null && normName(f.name) === normName(cat.folderName)) || null;
 }
+function setCategoryRoot(categoryKey) {
+  const cat = categoryByKey(categoryKey);
+  const root = getCategoryFolder(categoryKey);
+  if (!cat || !root) return false;
+  state.my.category = cat.key;
+  state.my.stack = [{ ...ROOT_STACK }, { id: root.id, name: cat.name, categoryKey: cat.key, isCategoryRoot: true }];
+  return true;
+}
 function setRootLibraryView() {
   state.my.category = null;
   state.my.stack = [{ ...ROOT_STACK }];
@@ -163,11 +171,14 @@ async function loadMy() {
     if (state.my._dirty) { state.my.folders = (await DB.listFolders()) || []; state.my._dirty = false; }
     if (LIB_CATEGORIES.some((cat) => !getCategoryFolder(cat.key))) await ensureCategoryRootFolders();
 
-    if (!state.my.category) {
-      renderMyCategories();
-      setLibStatus("");
-      return;
+    if (!categoryByKey(state.my.category) || !getCategoryFolder(state.my.category)) {
+      if (!setCategoryRoot(LIB_CATEGORIES[0].key)) {
+        renderMyCategoryTabs();
+        setLibStatus("Nie udało się przygotować sekcji Fiszki/Testy ABCD. Odśwież stronę i spróbuj ponownie.", "err");
+        return;
+      }
     }
+    renderMyCategoryTabs();
 
     const cat = categoryByKey(state.my.category);
     const parent = curFolderId();
@@ -199,32 +210,39 @@ function renderMyCrumbs() {
     b.className = "crumb" + (last ? " current" : "");
     b.textContent = f.name;
     if (!last) b.addEventListener("click", () => {
-      state.my.stack = state.my.stack.slice(0, i + 1);
-      state.my.category = state.my.stack.length > 1 ? state.my.stack[1].categoryKey : null;
+      if (i === 0 && state.my.category) {
+        setCategoryRoot(state.my.category);
+      } else {
+        state.my.stack = state.my.stack.slice(0, i + 1);
+        state.my.category = state.my.stack.length > 1 ? state.my.stack[1].categoryKey : null;
+      }
       loadMy();
     });
     nav.appendChild(b);
   });
 }
 
-function renderMyCategories() {
-  renderMyCrumbs();
-  const list = $("#my-list");
-  list.innerHTML = "";
-  $("#my-empty").classList.add("hidden");
-
+function renderMyCategoryTabs() {
+  const tabs = $("#my-category-tabs");
+  if (!tabs) return;
+  tabs.innerHTML = "";
   LIB_CATEGORIES.forEach((cat) => {
-    const root = getCategoryFolder(cat.key);
-    const li = document.createElement("li");
-    const row = rowEl("category", cat.icon, cat.name, cat.sub);
-    row.querySelector(".lib-row").addEventListener("click", () => {
-      if (!root) return setLibStatus("Nie udało się odnaleźć sekcji. Odśwież stronę i spróbuj ponownie.", "err");
-      state.my.category = cat.key;
-      state.my.stack = [{ ...ROOT_STACK }, { id: root.id, name: cat.name, categoryKey: cat.key, isCategoryRoot: true }];
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "category-tab" + (state.my.category === cat.key ? " is-active" : "");
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", state.my.category === cat.key ? "true" : "false");
+    b.dataset.category = cat.key;
+    b.innerHTML = `<span class="category-tab-icon">${cat.icon}</span><span>${escapeHtml(cat.name)}</span>`;
+    b.addEventListener("click", () => {
+      if (state.my.category === cat.key && state.my.stack.length === 2) return;
+      if (!setCategoryRoot(cat.key)) {
+        setLibStatus("Nie udało się odnaleźć sekcji. Odśwież stronę i spróbuj ponownie.", "err");
+        return;
+      }
       loadMy();
     });
-    li.appendChild(row);
-    list.appendChild(li);
+    tabs.appendChild(b);
   });
 }
 
@@ -253,6 +271,7 @@ function renderMy(folders, materials) {
     const sub = (m.type === "test" ? "Test ABCD" : "Fiszki") + " · " + fmtDate(m.updated_at);
     const row = rowEl("file", m.type === "test" ? "≡" : "❏", m.title, sub);
     row.querySelector(".lib-row").addEventListener("click", () => openMaterial(m.id));
+    row.appendChild(iconBtn("↪", "Przenieś do folderu", (e) => { e.stopPropagation(); openMovePicker(m); }));
     row.appendChild(iconBtn("✎", "Edytuj", (e) => { e.stopPropagation(); editMaterial(m.id); }));
     row.appendChild(iconBtn("✕", "Usuń", async (e) => {
       e.stopPropagation();
@@ -317,6 +336,94 @@ function iconBtn(glyph, label, onClick) {
   b.textContent = glyph;
   b.addEventListener("click", onClick);
   return b;
+}
+
+// ── Modal (ogólny) + przenoszenie materiałów do/z folderów ───────────────────
+function openModal(title, buildBody) {
+  $("#modal-title").textContent = title;
+  const body = $("#modal-body");
+  body.innerHTML = "";
+  buildBody(body);
+  $("#modal-overlay").classList.remove("hidden");
+}
+function closeModal() { $("#modal-overlay").classList.add("hidden"); }
+$("#modal-close").addEventListener("click", closeModal);
+$("#modal-overlay").addEventListener("click", (e) => { if (e.target === $("#modal-overlay")) closeModal(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#modal-overlay").classList.contains("hidden")) closeModal(); });
+
+/** Drzewo folderów danej kategorii: korzeń sekcji + podfoldery (z wcięciem). */
+function categoryFolderTree(catKey) {
+  const root = getCategoryFolder(catKey);
+  if (!root) return [];
+  const cat = categoryByKey(catKey);
+  const out = [{ id: root.id, name: cat.name, depth: 0, isRoot: true }];
+  const walk = (pid, depth) => {
+    state.my.folders
+      .filter((f) => (f.parent_id || null) === pid && !isCategoryRootFolder(f))
+      .sort((a, b) => a.name.localeCompare(b.name, "pl"))
+      .forEach((f) => { out.push({ id: f.id, name: f.name, depth }); walk(f.id, depth + 1); });
+  };
+  walk(root.id, 1);
+  return out;
+}
+
+function openMovePicker(m) {
+  const cat = categoryByType(m.type);
+  if (!cat) return setLibStatus("Nie można ustalić sekcji materiału.", "err");
+  const root = getCategoryFolder(cat.key);
+  const rootId = root ? root.id : null;
+  const cur = m.folder_id || rootId;            // legacy null traktujemy jak „góra sekcji”
+  const inSubfolder = cur !== rootId;
+  const tree = categoryFolderTree(cat.key);
+
+  openModal("Przenieś materiał", (body) => {
+    const info = document.createElement("p");
+    info.className = "modal-sub";
+    info.textContent = `„${m.title}” — wybierz folder w sekcji ${cat.name}.`;
+    body.appendChild(info);
+
+    tree.forEach((node) => {
+      const isCurrent = node.id === cur;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "move-target" + (isCurrent ? " is-current" : "");
+      b.style.paddingLeft = 12 + node.depth * 18 + "px";
+      let label;
+      if (node.isRoot) label = inSubfolder ? `↩ Usuń z folderu (góra sekcji)` : `${cat.name} (góra sekcji)`;
+      else label = node.name;
+      b.innerHTML =
+        `<span class="move-ico">${node.isRoot ? "■" : "▤"}</span>` +
+        `<span class="move-name">${escapeHtml(label)}</span>` +
+        (isCurrent ? `<span class="move-here">tutaj</span>` : "");
+      if (!isCurrent) b.addEventListener("click", () => doMove(m, node.id));
+      body.appendChild(b);
+    });
+
+    const nf = document.createElement("button");
+    nf.type = "button";
+    nf.className = "move-newfolder";
+    nf.textContent = "+ Nowy folder tutaj";
+    nf.addEventListener("click", async () => {
+      const name = (prompt("Nazwa nowego folderu:") || "").trim();
+      if (!name) return;
+      try {
+        const created = await DB.createFolder(name, rootId);
+        state.my._dirty = true;
+        if (created) await doMove(m, created.id);
+      } catch (e) { setLibStatus(e.message, "err"); }
+    });
+    body.appendChild(nf);
+  });
+}
+
+async function doMove(m, folderId) {
+  try {
+    await DB.moveMaterial(m.id, folderId);
+    closeModal();
+    state.my._dirty = true;
+    await loadMy();
+    setLibStatus(`Przeniesiono „${m.title}”.`, "ok");
+  } catch (e) { setLibStatus(e.message, "err"); }
 }
 
 $("#btn-new-folder").addEventListener("click", async () => {
