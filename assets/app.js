@@ -446,6 +446,26 @@ function setEdStatus(msg, kind = "") {
   $("#ed-status").className = "status" + (kind ? " " + kind : "");
 }
 
+function populateFolderSelect(catKey, selectedId) {
+  const sel = $("#ed-folder");
+  sel.innerHTML = "";
+  const tree = categoryFolderTree(catKey);
+  if (!tree.length) {
+    const o = document.createElement("option");
+    o.value = ""; o.textContent = "(góra sekcji)";
+    sel.appendChild(o);
+    return;
+  }
+  tree.forEach((node) => {
+    const o = document.createElement("option");
+    o.value = node.id;
+    const indent = node.depth > 0 ? "\u00A0\u00A0".repeat(node.depth) + "↳ " : "";
+    o.textContent = indent + (node.isRoot ? node.name + " (góra sekcji)" : node.name);
+    if (node.id === selectedId) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
 async function editMaterial(id) {
   const cat = categoryByKey(state.my.category);
   state.editing = { id: id, folderId: curFolderId(), categoryKey: state.my.category };
@@ -458,12 +478,17 @@ async function editMaterial(id) {
       $("#ed-title").value = m.title;
       $("#ed-type").value = m.type;
       $("#ed-content").value = m.content;
+      const catKey = (categoryByType(m.type) || cat || {}).key || state.my.category;
+      state.editing.categoryKey = catKey;
+      const rootId = (getCategoryFolder(catKey) || {}).id || null;
+      populateFolderSelect(catKey, m.folder_id || rootId);
     } catch (e) { return setLibStatus(e.message, "err"); }
   } else {
     $("#editor-title").textContent = cat ? `Nowy materiał — ${cat.name}` : "Nowy materiał";
     $("#ed-title").value = "";
     $("#ed-type").value = cat ? cat.type : "auto";
     $("#ed-content").value = "";
+    populateFolderSelect(state.my.category, curFolderId());
   }
   showScreen("screen-editor");
 }
@@ -472,6 +497,7 @@ async function saveMaterial() {
   const title = $("#ed-title").value.trim();
   const content = $("#ed-content").value;
   let type = $("#ed-type").value;
+  const folderId = $("#ed-folder").value || null;
   const cat = state.editing ? categoryByKey(state.editing.categoryKey) : null;
   if (!title) return setEdStatus("Podaj tytuł.", "err");
   if (!content.trim()) return setEdStatus("Treść jest pusta.", "err");
@@ -488,9 +514,10 @@ async function saveMaterial() {
 
   setEdStatus("Zapisuję…");
   try {
-    if (state.editing.id) await DB.updateMaterial(state.editing.id, { title, type, content });
-    else await DB.createMaterial({ title, type, content, folderId: state.editing.folderId });
+    if (state.editing.id) await DB.updateMaterial(state.editing.id, { title, type, content, folder_id: folderId });
+    else await DB.createMaterial({ title, type, content, folderId });
     setEdStatus("");
+    state.my._dirty = true;
     showScreen("screen-library");
     loadMy();
   } catch (e) { setEdStatus(e.message, "err"); }

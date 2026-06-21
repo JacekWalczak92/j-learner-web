@@ -656,14 +656,20 @@ select.text-input {
 .lib-list {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  grid-template-columns: minmax(0, 1fr); /* mobile-first: jedna kolumna, odporne na każdy silnik */
   gap: 12px;
   margin: 16px 0 0;
   padding: 0;
 }
-.lib-list > li { min-width: 0; }
+.lib-list > li { min-width: 0; max-width: 100%; }
+/* Na szerszych ekranach układ wielokolumnowy (bez funkcji min(), dla zgodności) */
+@media (min-width: 760px) {
+  .lib-list { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+}
 
 .lib-rowwrap {
+  min-width: 0;
+  max-width: 100%;
   min-height: 76px;
   display: flex;
   align-items: stretch;
@@ -728,6 +734,8 @@ select.text-input {
 .row-action {
   flex: 0 0 44px;
   width: 44px;
+  box-sizing: border-box;
+  min-width: 44px;
   min-height: 100%;
   display: grid;
   place-items: center;
@@ -1243,7 +1251,7 @@ select.text-input {
   .category-tab { min-height: 44px; gap: 6px; font-size: 0.82rem; white-space: normal; }
   .category-tab-icon { width: 22px; height: 22px; border-radius: 8px; }
   .lib-actions { grid-template-columns: 1fr; }
-  .row-action { flex-basis: 40px; width: 40px; }
+  .row-action { flex: 0 0 40px; width: 40px; min-width: 40px; }
   .qcard,
   .ready,
   .results-card { padding: 18px; }
