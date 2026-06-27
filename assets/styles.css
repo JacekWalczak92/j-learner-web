@@ -1484,3 +1484,4 @@ select.text-input {
   max-height: 320px;
   overflow-y: auto;
 }
+.explain-text.explain-empty { color: var(--muted); font-size: 0.9rem; }

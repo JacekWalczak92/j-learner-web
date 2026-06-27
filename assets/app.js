@@ -840,7 +840,7 @@ function renderExplanation(hostId, text) {
   const host = document.getElementById(hostId);
   if (!host) return;
   const note = text == null ? "" : String(text).trim();
-  if (!note) { hideExplanation(hostId); return; }   // brak notatki → nic nie pokazujemy
+  const has = note.length > 0;
   host.innerHTML = "";
   host.classList.remove("hidden");
 
@@ -855,14 +855,21 @@ function renderExplanation(hostId, text) {
 
   const panel = document.createElement("div");
   panel.className = "explain-panel hidden";
-  const head = document.createElement("div");
-  head.className = "explain-head";
-  head.textContent = "NOTATKA / MATERIAŁ ŹRÓDŁOWY";
-  const body = document.createElement("div");
-  body.className = "explain-text";
-  body.textContent = note;   // textContent = bezpieczne, bez wstrzyknięcia HTML
-  panel.appendChild(head);
-  panel.appendChild(body);
+  if (has) {
+    const head = document.createElement("div");
+    head.className = "explain-head";
+    head.textContent = "NOTATKA / MATERIAŁ ŹRÓDŁOWY";
+    const body = document.createElement("div");
+    body.className = "explain-text";
+    body.textContent = note;   // textContent = bezpieczne, bez wstrzyknięcia HTML
+    panel.appendChild(head);
+    panel.appendChild(body);
+  } else {
+    const body = document.createElement("div");
+    body.className = "explain-text explain-empty";
+    body.textContent = "Brak notatki dla tego materiału. Notatki dodajesz w aplikacji (AI Lab z włączoną opcją „Notatki do pytań” albo ręcznie w edycji) — wtedy pojawią się tutaj.";
+    panel.appendChild(body);
+  }
 
   btn.addEventListener("click", () => {
     const open = panel.classList.toggle("hidden") === false;
