@@ -741,18 +741,18 @@ $("#btn-start").addEventListener("click", () => {
     if (state.mode === "exam") startExam(remaining, { shuffleQ: sq, shuffleA: sa });
     else startClassic(remaining, { shuffleQ: sq, shuffleA: sa });
   } else if (state.mode === "tflash") {
-    const cards = mat.items.map((q) => ({ front: q.question, back: JLP.correctAnswersText(q), key: testKey(q) }));
+    const cards = mat.items.map((q) => ({ front: q.question, back: JLP.correctAnswersText(q), key: testKey(q), explanation: q.explanation }));
     const remaining = cards.filter((c) => !passed.has(c.key));
     if (!remaining.length) return allDoneNotice();
     startGrade(remaining, GRADE_CFG.tflash, sq, "flash");
   } else if (state.mode === "nauka") {
-    const cards = mat.items.map((c) => { const key = flashKey(c); return rev ? { front: c.back, back: c.front, key } : { front: c.front, back: c.back, key }; });
+    const cards = mat.items.map((c) => { const key = flashKey(c); const base = rev ? { front: c.back, back: c.front, key } : { front: c.front, back: c.back, key }; base.explanation = c.explanation; return base; });
     const remaining = cards.filter((c) => !passed.has(c.key));
     if (!remaining.length) return allDoneNotice();
     startGrade(remaining, GRADE_CFG.nauka, sc, "nauka");
   } else {
     // Przegląd — zwykłe przeglądanie kart: następna / poprzednia, bez ocen
-    const cards = mat.items.map((c) => (rev ? { front: c.back, back: c.front } : { front: c.front, back: c.back }));
+    const cards = mat.items.map((c) => (rev ? { front: c.back, back: c.front, explanation: c.explanation } : { front: c.front, back: c.back, explanation: c.explanation }));
     startBrowse(cards, { shuffle: sc });
   }
 });
@@ -780,6 +780,7 @@ function prepareItems(items, shuffleA) {
       correctIndex: correctIndices.length ? correctIndices[0] : 0,
       correctIndices,
       key: q.key,
+      explanation: q.explanation,
     };
   });
 }
@@ -830,6 +831,49 @@ function revealAnswerButtons(correctIndices, chosen) {
   });
 }
 
+// ── Panel notatki ("?") — fragment materiału, na podstawie którego ułożono pytanie ──
+function hideExplanation(hostId) {
+  const host = document.getElementById(hostId);
+  if (host) { host.innerHTML = ""; host.classList.add("hidden"); }
+}
+function renderExplanation(hostId, text) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  const note = text == null ? "" : String(text).trim();
+  if (!note) { hideExplanation(hostId); return; }   // brak notatki → nic nie pokazujemy
+  host.innerHTML = "";
+  host.classList.remove("hidden");
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn btn-explain";
+  const label = document.createElement("span");
+  label.className = "explain-label-btn";
+  label.textContent = "Notatka do pytania";
+  btn.innerHTML = '<span class="explain-q">?</span>';
+  btn.appendChild(label);
+
+  const panel = document.createElement("div");
+  panel.className = "explain-panel hidden";
+  const head = document.createElement("div");
+  head.className = "explain-head";
+  head.textContent = "NOTATKA / MATERIAŁ ŹRÓDŁOWY";
+  const body = document.createElement("div");
+  body.className = "explain-text";
+  body.textContent = note;   // textContent = bezpieczne, bez wstrzyknięcia HTML
+  panel.appendChild(head);
+  panel.appendChild(body);
+
+  btn.addEventListener("click", () => {
+    const open = panel.classList.toggle("hidden") === false;
+    btn.classList.toggle("active", open);
+    label.textContent = open ? "Ukryj notatkę" : "Notatka do pytania";
+  });
+
+  host.appendChild(btn);
+  host.appendChild(panel);
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 //  TRYB: SESJA TESTOWA (EXAM) — ABCD, wynik na końcu
 // ════════════════════════════════════════════════════════════════════════════
@@ -859,6 +903,7 @@ function renderExam() {
   setMultiBadge(multi);
   showCheckBtn(multi);
   buildAnswers($("#test-answers"), q.answers, answerExam, { multi });
+  hideExplanation("test-explain");
 }
 function answerExam(i) {
   const t = state.test;
@@ -869,6 +914,7 @@ function answerExam(i) {
   revealAnswerButtons(q.correctIndices, new Set([i]));
   if (i === q.correctIndex) { t.correct++; $("#test-score").textContent = `✓ ${t.correct}`; }
   else t.wrong.push(q);
+  renderExplanation("test-explain", q.explanation);
   $("#btn-test-next").disabled = false;
   $("#btn-test-next").focus();
 }
@@ -885,6 +931,7 @@ function checkExam() {
   const ok = chosen.size === correctSet.size && [...chosen].every((x) => correctSet.has(x));
   if (ok) { t.correct++; $("#test-score").textContent = `✓ ${t.correct}`; }
   else t.wrong.push(q);
+  renderExplanation("test-explain", q.explanation);
   $("#btn-test-next").disabled = false;
   $("#btn-test-next").focus();
 }
@@ -901,7 +948,7 @@ function finishExam() {
   showResults({
     pct, title: "Sesja testowa — koniec", line: `${t.correct} / ${t.total} poprawnych odpowiedzi`, color: "var(--indigo)",
     wrong: retry.map((q) => ({ question: q.question, answer: JLP.correctAnswersText(q) })),
-    onRetryWrong: retry.length ? () => startExam(retry.map((q) => ({ question: q.question, answers: q.answers, correctIndex: q.correctIndex, correctIndices: q.correctIndices })), { shuffleQ: true, shuffleA: true }) : null,
+    onRetryWrong: retry.length ? () => startExam(retry.map((q) => ({ question: q.question, answers: q.answers, correctIndex: q.correctIndex, correctIndices: q.correctIndices, explanation: q.explanation })), { shuffleQ: true, shuffleA: true }) : null,
     onRetryAll: state.restart,
   });
 }
@@ -937,6 +984,7 @@ function renderClassic() {
   $("#test-progress").style.width = `${(c.passed / c.total) * 100}%`;
   $("#test-controls").classList.add("hidden");
   $("#test-rating").classList.add("hidden");
+  hideExplanation("test-explain");
   if (e.mode === "abcd") {
     const multi = isMultiQ(e.item);
     $("#test-textwrap").classList.add("hidden");
@@ -964,6 +1012,7 @@ function classicAnswer(i) {
   if (isMultiQ(q)) { toggleAnswerByIdx(i); return; }
   c.locked = true;
   revealAnswerButtons(q.correctIndices, new Set([i]));
+  renderExplanation("test-explain", q.explanation);
   $("#test-rating").classList.remove("hidden");
 }
 function checkClassic() {
@@ -975,6 +1024,7 @@ function checkClassic() {
   c.locked = true;
   revealAnswerButtons(q.correctIndices, chosen);
   showCheckBtn(false);
+  renderExplanation("test-explain", q.explanation);
   $("#test-rating").classList.remove("hidden");
 }
 function classicRate(easy) {
@@ -991,6 +1041,7 @@ function classicTextShow() {
   $("#test-text-reveal").classList.remove("hidden");
   $("#test-text-show").classList.add("hidden");
   $("#test-text-grade").classList.remove("hidden");
+  renderExplanation("test-explain", e.item.explanation);
 }
 function classicTextGrade(kind) {
   const c = state.classic;
@@ -1017,7 +1068,7 @@ function startGrade(cards, cfg, shuffle, mode) {
   const list = shuffle ? shuffled(cards) : cards.slice();
   state.flashMode = "grade";
   state.browse = null;
-  state.grade = { queue: list.map((c) => ({ front: c.front, back: c.back, key: c.key })), total: cards.length, done: 0, cfg, mode, revealed: false };
+  state.grade = { queue: list.map((c) => ({ front: c.front, back: c.back, key: c.key, explanation: c.explanation })), total: cards.length, done: 0, cfg, mode, revealed: false };
   state.restart = () => startGrade(cards, cfg, shuffle, mode);
   showScreen("screen-flash");
   renderGrade();
@@ -1037,6 +1088,7 @@ function renderGrade() {
   $("#flash-browse").classList.add("hidden");
   $("#flash-controls-front").classList.remove("hidden");
   $("#flash-grades").classList.add("hidden");
+  hideExplanation("flash-explain");
 }
 function revealGrade() {
   const g = state.grade;
@@ -1055,6 +1107,7 @@ function revealGrade() {
     box.appendChild(b);
   });
   box.classList.remove("hidden");
+  renderExplanation("flash-explain", g.queue[0] && g.queue[0].explanation);
 }
 function applyGrade(gr) {
   const g = state.grade;
@@ -1105,8 +1158,10 @@ function renderBrowse() {
   $("#flash-browse").classList.remove("hidden");
   $("#btn-flash-prev").disabled = s.idx === 0;
   $("#btn-flash-next").disabled = s.idx === s.cards.length - 1;
+  if (s.flipped) renderExplanation("flash-explain", c.explanation);
+  else hideExplanation("flash-explain");
 }
-function browseFlip() { const s = state.browse; if (!s) return; s.flipped = !s.flipped; $("#flash-card").classList.toggle("flipped", s.flipped); }
+function browseFlip() { const s = state.browse; if (!s) return; s.flipped = !s.flipped; $("#flash-card").classList.toggle("flipped", s.flipped); const c = s.cards[s.idx]; if (s.flipped) renderExplanation("flash-explain", c && c.explanation); else hideExplanation("flash-explain"); }
 function browseNext() { const s = state.browse; if (s && s.idx < s.cards.length - 1) { s.idx++; s.flipped = false; renderBrowse(); } }
 function browsePrev() { const s = state.browse; if (s && s.idx > 0) { s.idx--; s.flipped = false; renderBrowse(); } }
 

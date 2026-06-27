@@ -1,5 +1,5 @@
-bodziec warunkowy;bodziec, który po skojarzeniu wywołuje reakcję warunkową;warunkowanie
-walidacja;stopień, w jakim test mierzy to, co ma mierzyć;psychometria
-rzetelność;spójność i powtarzalność pomiaru;psychometria
-hipoteza zerowa;założenie o braku efektu lub różnicy;statystyka
-zmienna niezależna;zmienna manipulowana przez badacza;metodologia
+bodziec warunkowy;bodziec, który po skojarzeniu wywołuje reakcję warunkową;warunkowanie;W eksperymencie Pawłowa dzwonek (bodziec neutralny) po wielokrotnym skojarzeniu z pokarmem stał się bodźcem warunkowym wywołującym ślinienie — reakcję warunkową.
+walidacja;stopień, w jakim test mierzy to, co ma mierzyć;psychometria;Trafność (walidacja) dzieli się m.in. na treściową, kryterialną i teoretyczną. Różni się od rzetelności, która dotyczy powtarzalności pomiaru.
+rzetelność;spójność i powtarzalność pomiaru;psychometria;Najczęstsze wskaźniki: test-retest, alfa Cronbacha, rzetelność połówkowa. Wysoka rzetelność nie gwarantuje trafności.
+hipoteza zerowa;założenie o braku efektu lub różnicy;statystyka;H0 zakłada brak efektu; testy istotności sprawdzają, czy dane pozwalają ją odrzucić na rzecz hipotezy alternatywnej. Odrzucenie H0 nie „dowodzi" H1, tylko czyni ją bardziej prawdopodobną.
+zmienna niezależna;zmienna manipulowana przez badacza;metodologia;To „przyczyna" w schemacie eksperymentalnym — badacz ją zmienia, by obserwować wpływ na zmienną zależną (mierzony skutek).

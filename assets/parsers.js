@@ -10,10 +10,12 @@
 //      D: odpowiedź D
 //      CORRECT: A          (litera A/B/C/D — poprawna odpowiedź)
 //      CORRECT: A, C        (kilka liter — pytanie wielokrotnego wyboru)
+//      EXPLAIN: notatka     (opcjonalna 7. linia — fragment materiału pod "?")
 //
 //  FISZKI (jedna fiszka = jedna linia):
-//      przód;tył              (średnik; albo tabulator)
-//      przód;tył;tagi         (tagi opcjonalne)
+//      przód;tył                      (średnik; albo tabulator)
+//      przód;tył;tagi                 (tagi opcjonalne)
+//      przód;tył;tagi;notatka         (4. pole = notatka pod "?", opcjonalne)
 // ============================================================================
 
 /** Usuwa prefiks "X:" / "x:" z początku linii i przycina białe znaki. */
@@ -49,9 +51,26 @@ function correctAnswersText(q) {
 }
 
 /**
+ * Rozpoznaje opcjonalną linię z notatką do pytania (EXPLAIN/WYJASNIENIE/NOTE/NOTATKA).
+ * @returns {string|null} treść notatki albo null, gdy linia nie jest notatką.
+ */
+function extractExplanation(line) {
+  if (line == null) return null;
+  const raw = String(line).trim();
+  const prefixes = ["EXPLAIN:", "WYJASNIENIE:", "WYJAŚNIENIE:", "NOTE:", "NOTATKA:"];
+  for (const p of prefixes) {
+    if (raw.length >= p.length && raw.slice(0, p.length).toUpperCase() === p) {
+      return raw.slice(p.length).trim();
+    }
+  }
+  return null;
+}
+
+/**
  * Parsuje tekst w formacie Q:/A:/B:/C:/D:/CORRECT: na listę pytań.
  * CORRECT może zawierać kilka liter (np. "A, C") — wtedy pytanie ma wiele poprawnych.
- * @returns {Array<{question:string, answers:string[], correctIndex:number, correctIndices:number[]}>}
+ * Opcjonalna 7. linia "EXPLAIN: ..." dodaje notatkę do pytania.
+ * @returns {Array<{question:string, answers:string[], correctIndex:number, correctIndices:number[], explanation:string|null}>}
  */
 function parseTestText(text) {
   const questions = [];
@@ -83,10 +102,12 @@ function parseTestText(text) {
       const idx = parseCorrectIndices(correct);
       const correctIndices = idx.length ? idx : [0];
       const correctIndex = correctIndices[0];
+      const explanation = extractExplanation(lines[i + 6]);
+      const consumed = explanation != null ? 7 : 6;
       if (question && a) {
-        questions.push({ question, answers: [a, b, c, d], correctIndex, correctIndices });
+        questions.push({ question, answers: [a, b, c, d], correctIndex, correctIndices, explanation });
       }
-      i += 6;
+      i += consumed;
     } else {
       i++;
     }
@@ -95,8 +116,9 @@ function parseTestText(text) {
 }
 
 /**
- * Parsuje tekst fiszek (przód;tył;tagi lub z tabulatorem) na listę kart.
- * @returns {Array<{front:string, back:string, tags:string}>}
+ * Parsuje tekst fiszek (przód;tył;tagi;notatka lub z tabulatorem) na listę kart.
+ * Tagi i notatka są opcjonalne.
+ * @returns {Array<{front:string, back:string, tags:string, explanation:string}>}
  */
 function parseFlashcardText(text) {
   const cards = [];
@@ -105,8 +127,8 @@ function parseFlashcardText(text) {
     if (!trimmed) continue;
 
     let parts;
-    if (trimmed.includes(";")) parts = splitLimit(trimmed, ";", 3);
-    else if (trimmed.includes("\t")) parts = splitLimit(trimmed, "\t", 3);
+    if (trimmed.includes(";")) parts = splitLimit(trimmed, ";", 4);
+    else if (trimmed.includes("\t")) parts = splitLimit(trimmed, "\t", 4);
     else continue;
 
     if (parts.length >= 2 && parts[0].trim() && parts[1].trim()) {
@@ -114,6 +136,7 @@ function parseFlashcardText(text) {
         front: parts[0].trim(),
         back: parts[1].trim(),
         tags: parts.length >= 3 ? parts[2].trim() : "",
+        explanation: parts.length >= 4 ? parts[3].trim() : "",
       });
     }
   }
@@ -162,4 +185,5 @@ window.JLParsers = {
   detectMaterialType,
   parseCorrectIndices,
   correctAnswersText,
+  extractExplanation,
 };

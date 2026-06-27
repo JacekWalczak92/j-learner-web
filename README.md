@@ -64,7 +64,7 @@ Supabase daje gotowe REST API. Materiały publiczne dodajesz kluczem `service_ro
 
 ## Formaty treści
 
-**Test ABCD** (blok = 6 linii):
+**Test ABCD** (blok = 6 linii, opcjonalnie 7. linia z notatką):
 
 ```
 Q: treść pytania
@@ -73,6 +73,7 @@ B: odpowiedź B
 C: odpowiedź C
 D: odpowiedź D
 CORRECT: B
+EXPLAIN: fragment materiału / wyjaśnienie pokazywane pod „?"
 ```
 
 Linia `CORRECT:` może wskazywać kilka poprawnych odpowiedzi — wtedy pytanie staje się
@@ -80,7 +81,11 @@ wielokrotnego wyboru (np. `CORRECT: A, C`; akceptowane też `A C` lub `AC`). W s
 takie pytanie pokazuje checkboxy i przycisk **Sprawdź**; zalicza się tylko przy zaznaczeniu
 wszystkich poprawnych (i żadnej błędnej).
 
-**Fiszki** (jedna na linię): `przód;tył` (opcjonalnie `;tagi`). Przykłady: `samples/`.
+Opcjonalna linia `EXPLAIN:` (albo `WYJAŚNIENIE:` / `NOTE:` / `NOTATKA:`) dodaje notatkę do
+pytania — w trakcie nauki pojawia się przycisk „?", pod którym widać ten fragment materiału.
+
+**Fiszki** (jedna na linię): `przód;tył` (opcjonalnie `;tagi`, a po nich opcjonalnie
+`;notatka` jako 4. pole — pokazywana pod „?"). Przykłady: `samples/`.
 
 ## Struktura plików
 

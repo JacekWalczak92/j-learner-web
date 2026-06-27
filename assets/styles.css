@@ -1422,3 +1422,65 @@ select.text-input {
   background: transparent; color: var(--indigo); cursor: pointer; font: inherit; font-weight: 700;
 }
 .move-newfolder:hover { background: var(--indigo-soft); }
+
+/* ── Panel notatki ("?") — fragment materiału pod pytaniem/fiszką ─────────── */
+.explain { margin: 12px 0 2px; }
+.explain.hidden { display: none; }
+
+.btn-explain {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 16px;
+  border: 1px solid var(--indigo-ring);
+  border-radius: 999px;
+  background: var(--indigo-soft);
+  color: var(--indigo);
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.btn-explain:hover { border-color: var(--indigo); }
+.btn-explain.active { background: var(--indigo); color: #0c0a1f; border-color: var(--indigo); }
+.btn-explain.active .explain-q { background: rgba(12, 10, 31, 0.18); color: #0c0a1f; }
+
+.explain-q {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(124, 108, 255, 0.22);
+  color: var(--indigo);
+  font-weight: 800;
+  font-size: 0.82rem;
+  line-height: 1;
+}
+.explain-label-btn { white-space: nowrap; }
+
+.explain-panel {
+  margin-top: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.explain-panel.hidden { display: none; }
+.explain-head {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  font-weight: 800;
+  color: var(--indigo);
+  margin-bottom: 8px;
+}
+.explain-text {
+  white-space: pre-wrap;
+  line-height: 1.55;
+  color: var(--ink);
+  font-size: 0.96rem;
+  max-height: 320px;
+  overflow-y: auto;
+}

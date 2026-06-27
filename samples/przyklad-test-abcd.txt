@@ -4,6 +4,7 @@ B: Hipokamp
 C: Ciało migdałowate
 D: Most
 CORRECT: B
+EXPLAIN: Hipokamp (część układu limbicznego) odpowiada za konsolidację śladów pamięciowych — przenoszenie informacji z pamięci krótkotrwałej do długotrwałej. Uszkodzenie hipokampa (np. u pacjenta H.M.) prowadzi do amnezji następczej.
 
 Q: Zmienna, którą badacz celowo manipuluje, to zmienna:
 A: zależna
@@ -11,6 +12,7 @@ B: zakłócająca
 C: niezależna
 D: pośrednicząca
 CORRECT: C
+EXPLAIN: Zmienna niezależna to ta, którą badacz wprowadza/zmienia, by zobaczyć jej wpływ na zmienną zależną (mierzony wynik). Zmienna zakłócająca to niekontrolowany czynnik, który może zniekształcić wynik.
 
 Q: Co opisuje rzetelność testu psychometrycznego?
 A: Trafność treściową
@@ -18,6 +20,7 @@ B: Spójność i powtarzalność pomiaru
 C: Liczbę pozycji testowych
 D: Normy stenowe
 CORRECT: B
+EXPLAIN: Rzetelność = na ile pomiar jest powtarzalny i wolny od błędu losowego (np. test-retest, alfa Cronbacha). Trafność to osobna własność — czy test mierzy to, co ma mierzyć. Test może być rzetelny, ale nietrafny.
 
 Q: Które z poniższych są technikami badań jakościowych?
 A: Wywiad pogłębiony
@@ -25,3 +28,4 @@ B: Eksperyment laboratoryjny
 C: Obserwacja uczestnicząca
 D: Analiza regresji
 CORRECT: A, C
+EXPLAIN: Badania jakościowe opisują znaczenia i procesy (wywiad pogłębiony, obserwacja uczestnicząca, analiza treści). Eksperyment laboratoryjny i analiza regresji to podejścia ilościowe.
