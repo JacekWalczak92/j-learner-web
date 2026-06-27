@@ -254,14 +254,17 @@ function renderMy(folders, materials) {
 
   folders.forEach((f) => {
     const li = document.createElement("li");
-    const row = rowEl("folder", "▤", f.name, "Folder");
-    row.querySelector(".lib-row").addEventListener("click", () => { state.my.stack.push({ id: f.id, name: f.name, categoryKey: state.my.category }); loadMy(); });
-    row.appendChild(iconBtn("✕", "Usuń folder", async (e) => {
-      e.stopPropagation();
-      if (!confirm(`Usunąć folder „${f.name}" i jego zawartość?`)) return;
-      try { await DB.deleteFolder(f.id); state.my._dirty = true; loadMy(); }
-      catch (err) { setLibStatus(err.message, "err"); }
-    }));
+    const row = libCard({
+      kind: "folder", icon: "▤", name: f.name, sub: "Folder",
+      onOpen: () => { state.my.stack.push({ id: f.id, name: f.name, categoryKey: state.my.category }); loadMy(); },
+      actions: [
+        { glyph: "✕", label: "Usuń folder", danger: true, onClick: async () => {
+          if (!confirm(`Usunąć folder „${f.name}" i jego zawartość?`)) return;
+          try { await DB.deleteFolder(f.id); state.my._dirty = true; loadMy(); }
+          catch (err) { setLibStatus(err.message, "err"); }
+        } },
+      ],
+    });
     li.appendChild(row);
     list.appendChild(li);
   });
@@ -269,16 +272,19 @@ function renderMy(folders, materials) {
   materials.forEach((m) => {
     const li = document.createElement("li");
     const sub = (m.type === "test" ? "Test ABCD" : "Fiszki") + " · " + fmtDate(m.updated_at);
-    const row = rowEl("file", m.type === "test" ? "≡" : "❏", m.title, sub);
-    row.querySelector(".lib-row").addEventListener("click", () => openMaterial(m.id));
-    row.appendChild(iconBtn("↪", "Przenieś do folderu", (e) => { e.stopPropagation(); openMovePicker(m); }));
-    row.appendChild(iconBtn("✎", "Edytuj", (e) => { e.stopPropagation(); editMaterial(m.id); }));
-    row.appendChild(iconBtn("✕", "Usuń", async (e) => {
-      e.stopPropagation();
-      if (!confirm(`Usunąć materiał „${m.title}"?`)) return;
-      try { await DB.deleteMaterial(m.id); loadMy(); }
-      catch (err) { setLibStatus(err.message, "err"); }
-    }));
+    const row = libCard({
+      kind: "file", icon: m.type === "test" ? "≡" : "❏", name: m.title, sub,
+      onOpen: () => openMaterial(m.id),
+      actions: [
+        { glyph: "↪", label: "Przenieś", onClick: () => openMovePicker(m) },
+        { glyph: "✎", label: "Edytuj", onClick: () => editMaterial(m.id) },
+        { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
+          if (!confirm(`Usunąć materiał „${m.title}"?`)) return;
+          try { await DB.deleteMaterial(m.id); loadMy(); }
+          catch (err) { setLibStatus(err.message, "err"); }
+        } },
+      ],
+    });
     li.appendChild(row);
     list.appendChild(li);
   });
@@ -294,19 +300,22 @@ async function loadPublic() {
     materials.forEach((m) => {
       const li = document.createElement("li");
       const sub = (m.type === "test" ? "Test ABCD" : "Fiszki") + " · " + fmtDate(m.updated_at);
-      const row = rowEl("file", m.type === "test" ? "≡" : "❏", m.title, sub);
-      row.querySelector(".lib-row").addEventListener("click", () => openMaterial(m.id));
-      row.appendChild(iconBtn("⤓", "Kopiuj do moich", async (e) => {
-        e.stopPropagation();
-        try {
-          await ensureCategoryRootFolders();
-          const cat = categoryByType(m.type);
-          const root = cat ? getCategoryFolder(cat.key) : null;
-          await DB.copyToMine(m.id, root ? root.id : null);
-          setLibStatus(`Skopiowano „${m.title}" do sekcji „${cat ? cat.name : "Moje materiały"}".`, "ok");
-        }
-        catch (err) { setLibStatus(err.message, "err"); }
-      }));
+      const row = libCard({
+        kind: "file", icon: m.type === "test" ? "≡" : "❏", name: m.title, sub,
+        onOpen: () => openMaterial(m.id),
+        actions: [
+          { glyph: "⤓", label: "Kopiuj do moich", onClick: async () => {
+            try {
+              await ensureCategoryRootFolders();
+              const cat = categoryByType(m.type);
+              const root = cat ? getCategoryFolder(cat.key) : null;
+              await DB.copyToMine(m.id, root ? root.id : null);
+              setLibStatus(`Skopiowano „${m.title}" do sekcji „${cat ? cat.name : "Moje materiały"}".`, "ok");
+            }
+            catch (err) { setLibStatus(err.message, "err"); }
+          } },
+        ],
+      });
       li.appendChild(row);
       list.appendChild(li);
     });
@@ -314,9 +323,19 @@ async function loadPublic() {
   } catch (e) { setLibStatus(e.message, "err"); }
 }
 
-function rowEl(kind, icon, name, sub) {
+/**
+ * Karta biblioteki z pełną (zawijaną) nazwą i akcjami chowanymi pod przyciskiem „⋯".
+ * @param {{kind:string, icon:string, name:string, sub?:string, onOpen?:Function,
+ *          actions?:Array<{glyph:string,label:string,onClick:Function,danger?:boolean}>}} o
+ */
+function libCard(o) {
+  const { kind, icon, name, sub, onOpen, actions = [] } = o;
   const wrap = document.createElement("div");
   wrap.className = "lib-rowwrap";
+
+  const head = document.createElement("div");
+  head.className = "lib-head";
+
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "lib-row";
@@ -324,18 +343,42 @@ function rowEl(kind, icon, name, sub) {
     `<span class="lib-ico ${kind}">${icon}</span>` +
     `<span class="lib-row-main"><span class="lib-name">${escapeHtml(name)}</span>` +
     (sub ? `<span class="lib-sub">${escapeHtml(sub)}</span>` : "") + `</span>`;
-  wrap.appendChild(btn);
+  if (onOpen) btn.addEventListener("click", onOpen);
+  head.appendChild(btn);
+
+  let panel = null;
+  if (actions.length) {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "lib-expand";
+    toggle.title = "Więcej";
+    toggle.setAttribute("aria-label", "Więcej opcji");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.innerHTML = '<span class="lib-expand-ico">⋯</span>';
+    head.appendChild(toggle);
+
+    panel = document.createElement("div");
+    panel.className = "lib-card-actions hidden";
+    actions.forEach((a) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "lib-action" + (a.danger ? " danger" : "");
+      b.innerHTML = `<span class="lib-action-ico">${a.glyph}</span><span>${escapeHtml(a.label)}</span>`;
+      b.addEventListener("click", (e) => { e.stopPropagation(); a.onClick(e); });
+      panel.appendChild(b);
+    });
+
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const open = panel.classList.toggle("hidden") === false;
+      toggle.classList.toggle("active", open);
+      toggle.setAttribute("aria-expanded", String(open));
+    });
+  }
+
+  wrap.appendChild(head);
+  if (panel) wrap.appendChild(panel);
   return wrap;
-}
-function iconBtn(glyph, label, onClick) {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = "row-action";
-  b.title = label;
-  b.setAttribute("aria-label", label);
-  b.textContent = glyph;
-  b.addEventListener("click", onClick);
-  return b;
 }
 
 // ── Modal (ogólny) + przenoszenie materiałów do/z folderów ───────────────────
