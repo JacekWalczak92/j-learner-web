@@ -1,5 +1,5 @@
 // ============================================================================
-//  parsers.js — parsowanie materiałów wklejonych lub pobranych z Google Drive
+//  parsers.js (moduł ES) — parsowanie materiałów wklejonych lub wgranych z pliku
 //  Formaty zgodne 1:1 z aplikacją Android (J-Learner / AnkiFiszki).
 //
 //  TEST ABCD (blok = 6 linii, bloki oddzielone pustą linią):
@@ -74,7 +74,7 @@ function extractExplanation(line) {
  */
 function parseTestText(text) {
   const questions = [];
-  const lines = text
+  const lines = String(text == null ? "" : text)
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
@@ -122,7 +122,7 @@ function parseTestText(text) {
  */
 function parseFlashcardText(text) {
   const cards = [];
-  for (const raw of text.split(/\r?\n/)) {
+  for (const raw of String(text == null ? "" : text).split(/\r?\n/)) {
     const trimmed = raw.trim();
     if (!trimmed) continue;
 
@@ -162,7 +162,7 @@ function splitLimit(str, sep, limit) {
  * @returns {"test"|"flashcards"|"unknown"}
  */
 function detectMaterialType(text) {
-  const lines = text
+  const lines = String(text == null ? "" : text)
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
@@ -178,8 +178,7 @@ function detectMaterialType(text) {
   return "unknown";
 }
 
-// Eksport do globalnego zakresu (aplikacja używa zwykłych <script>).
-window.JLParsers = {
+export const JLParsers = {
   parseTestText,
   parseFlashcardText,
   detectMaterialType,

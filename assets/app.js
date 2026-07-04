@@ -1,5 +1,5 @@
 // ============================================================================
-//  app.js — J-Learner na Supabase: logowanie, biblioteka (foldery + publiczne),
+//  app.js (moduł ES) — J-Learner: logowanie, biblioteka (foldery + publiczne),
 //  edytor materiałów oraz sesje (test/fiszki). Silnik sesji jak dotąd.
 // ============================================================================
 
@@ -8,8 +8,10 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-const JLP = window.JLParsers;
-const DB = window.JLDB;
+import { JLParsers as JLP } from "./parsers.js?v=11";
+import { JLDB as DB } from "./supabase.js?v=11";
+
+const APP_VERSION = "11";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -19,7 +21,12 @@ const state = {
   material: null,
   test: null,
   flash: null,
-  my: { folders: [], stack: [{ id: null, name: "Moje materiały" }], category: null, _dirty: true },
+  my: {
+    folders: [], stack: [{ id: null, name: "Moje materiały" }], category: null, _dirty: true,
+    query: "", sort: "name",
+    lastFolders: [], lastMaterials: [], // ostatnio pobrane dane bieżącego widoku (filtr bez refetch)
+  },
+  pub: { items: [], query: "" },
   editing: null,
 };
 
@@ -53,6 +60,40 @@ function setRootLibraryView() {
   state.my.stack = [{ ...ROOT_STACK }];
 }
 
+// ── Toast + globalna siatka bezpieczeństwa na nieobsłużone błędy ─────────────
+let _toastTimer = null;
+function showToast(msg, kind = "err") {
+  let t = document.getElementById("jl-toast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "jl-toast";
+    t.setAttribute("role", "alert");
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.className = "jl-toast " + kind + " show";
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove("show"), 4200);
+}
+
+window.addEventListener("error", (e) => {
+  console.error("Nieobsłużony błąd:", e.error || e.message);
+  showToast("Wystąpił nieoczekiwany błąd. Jeśli się powtarza — odśwież stronę.");
+});
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("Nieobsłużona obietnica:", e.reason);
+  const msg = e.reason && e.reason.message ? e.reason.message : "Wystąpił nieoczekiwany błąd.";
+  showToast(msg);
+  e.preventDefault();
+});
+
+// Wygaśnięcie sesji (nieudane odświeżenie tokenu) → czysty powrót do logowania.
+DB.setSessionExpiredHandler(() => {
+  document.querySelector("#user-box").classList.add("hidden");
+  showScreen("screen-auth");
+  setAuthStatus("Sesja wygasła — zaloguj się ponownie.", "err");
+});
+
 function showScreen(id) {
   $$(".screen").forEach((s) => s.classList.toggle("is-active", s.id === id));
   window.scrollTo({ top: 0 });
@@ -61,10 +102,16 @@ function showScreen(id) {
 // ════════════════════════════════════════════════════════════════════════════
 //  AUTH
 // ════════════════════════════════════════════════════════════════════════════
-function setAuthStatus(msg, kind = "") {
-  $("#auth-status").textContent = msg;
-  $("#auth-status").className = "status" + (kind ? " " + kind : "");
+/** Fabryka setterów statusu — jeden wzorzec dla auth/biblioteki/edytora. */
+function makeStatus(sel) {
+  return (msg, kind = "") => {
+    const el = $(sel);
+    if (!el) return;
+    el.textContent = msg;
+    el.className = "status" + (kind ? " " + kind : "");
+  };
 }
+const setAuthStatus = makeStatus("#auth-status");
 
 function initApp() {
   if (!DB.isConfigured()) {
@@ -74,6 +121,7 @@ function initApp() {
     $("#btn-signup").disabled = true;
     return;
   }
+  if (initRecoveryFlow()) return;
   if (DB.getUser()) enterApp();
   else showScreen("screen-auth");
 }
@@ -110,25 +158,39 @@ async function ensureCategoryRootFolders() {
   } catch (_) {}
 }
 
-async function doSignIn() {
+function setAuthBusy(busy) {
+  $("#btn-signin").disabled = busy;
+  $("#btn-signup").disabled = busy;
+}
+function readAuthForm() {
   const email = $("#auth-email").value.trim();
   const pass = $("#auth-pass").value;
-  if (!email || !pass) return setAuthStatus("Podaj e-mail i hasło.", "err");
+  if (!email || !pass) { setAuthStatus("Podaj e-mail i hasło.", "err"); return null; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setAuthStatus("To nie wygląda na poprawny adres e-mail.", "err"); return null; }
+  return { email, pass };
+}
+
+async function doSignIn() {
+  const form = readAuthForm();
+  if (!form) return;
+  setAuthBusy(true);
   setAuthStatus("Logowanie…");
-  try { await DB.signIn(email, pass); setAuthStatus(""); await enterApp(); }
+  try { await DB.signIn(form.email, form.pass); setAuthStatus(""); await enterApp(); }
   catch (e) { setAuthStatus(e.message, "err"); }
+  finally { setAuthBusy(false); }
 }
 
 async function doSignUp() {
-  const email = $("#auth-email").value.trim();
-  const pass = $("#auth-pass").value;
-  if (!email || !pass) return setAuthStatus("Podaj e-mail i hasło.", "err");
+  const form = readAuthForm();
+  if (!form) return;
+  setAuthBusy(true);
   setAuthStatus("Zakładam konto…");
   try {
-    const { needsConfirm } = await DB.signUp(email, pass);
+    const { needsConfirm } = await DB.signUp(form.email, form.pass);
     if (needsConfirm) setAuthStatus("Konto utworzone. Potwierdź adres e-mail, potem się zaloguj.", "ok");
     else { setAuthStatus(""); await enterApp(); }
   } catch (e) { setAuthStatus(e.message, "err"); }
+  finally { setAuthBusy(false); }
 }
 
 function doSignOut() {
@@ -143,13 +205,62 @@ $("#btn-signup").addEventListener("click", doSignUp);
 $("#btn-logout").addEventListener("click", doSignOut);
 $("#auth-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") doSignIn(); });
 
+// ── Reset hasła ───────────────────────────────────────────────────────────────
+$("#btn-forgot").addEventListener("click", async () => {
+  const email = $("#auth-email").value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return setAuthStatus("Wpisz swój adres e-mail w polu powyżej, a potem kliknij ponownie.", "err");
+  }
+  $("#btn-forgot").disabled = true;
+  setAuthStatus("Wysyłam link do resetu hasła…");
+  try {
+    await DB.requestPasswordReset(email);
+    setAuthStatus("Jeśli konto istnieje, na " + email + " wysłaliśmy link do ustawienia nowego hasła.", "ok");
+  } catch (e) { setAuthStatus(e.message, "err"); }
+  finally { $("#btn-forgot").disabled = false; }
+});
+
+/** Link z e-maila wraca z tokenem w hashu: #access_token=…&refresh_token=…&type=recovery */
+function parseRecoveryHash() {
+  const h = window.location.hash;
+  if (!h || h.length < 2 || !h.includes("type=recovery")) return null;
+  const params = new URLSearchParams(h.slice(1));
+  const accessToken = params.get("access_token");
+  if (!accessToken) return null;
+  return { accessToken, refreshToken: params.get("refresh_token") || null };
+}
+
+function initRecoveryFlow() {
+  const tokens = parseRecoveryHash();
+  if (!tokens) return false;
+  // Sprzątamy hash z paska adresu (token nie powinien wisieć w historii/URL).
+  try { history.replaceState(null, "", window.location.pathname + window.location.search); } catch (_) {}
+  showScreen("screen-auth");
+  $("#recovery-box").classList.remove("hidden");
+  setAuthStatus("Link poprawny — ustaw nowe hasło.", "ok");
+  const save = async () => {
+    const pass = $("#recovery-pass").value;
+    if (!pass || pass.length < 6) return setAuthStatus("Hasło musi mieć co najmniej 6 znaków.", "err");
+    $("#btn-recovery-save").disabled = true;
+    setAuthStatus("Zapisuję nowe hasło…");
+    try {
+      await DB.updatePasswordWithToken(tokens.accessToken, tokens.refreshToken, pass);
+      $("#recovery-box").classList.add("hidden");
+      $("#recovery-pass").value = "";
+      setAuthStatus("");
+      await enterApp();
+    } catch (e) { setAuthStatus(e.message, "err"); }
+    finally { $("#btn-recovery-save").disabled = false; }
+  };
+  $("#btn-recovery-save").addEventListener("click", save);
+  $("#recovery-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") save(); });
+  return true;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 //  BIBLIOTEKA
 // ════════════════════════════════════════════════════════════════════════════
-function setLibStatus(msg, kind = "") {
-  $("#lib-status").textContent = msg;
-  $("#lib-status").className = "status" + (kind ? " " + kind : "");
-}
+const setLibStatus = makeStatus("#lib-status");
 
 function switchTab(tab) {
   $$('.source-tab[data-tab]').forEach((t) => t.classList.toggle("is-active", t.dataset.tab === tab));
@@ -188,9 +299,14 @@ async function loadMy() {
       ? state.my.folders.filter((f) => (f.parent_id || null) === null && !isCategoryRootFolder(f))
       : [];
     const folders = subfolders.concat(legacyRootFolders);
-    const directMaterials = (await DB.listMyMaterials(parent)) || [];
-    const legacyRootMaterials = isCategoryRoot ? ((await DB.listMyMaterials(null)) || []) : [];
+    // Równolegle zamiast sekwencyjnie — biblioteka otwiera się ~2× szybciej.
+    const [directMaterials, legacyRootMaterials] = await Promise.all([
+      DB.listMyMaterials(parent).then((r) => r || []),
+      isCategoryRoot ? DB.listMyMaterials(null).then((r) => r || []) : Promise.resolve([]),
+    ]);
     const materials = directMaterials.concat(legacyRootMaterials).filter((m) => m.type === cat.type);
+    state.my.lastFolders = folders;
+    state.my.lastMaterials = materials;
     renderMy(folders, materials);
     setLibStatus("");
   } catch (e) { setLibStatus(e.message, "err"); }
@@ -246,11 +362,28 @@ function renderMyCategoryTabs() {
   });
 }
 
-function renderMy(folders, materials) {
+function matchesQuery(name, query) {
+  return !query || String(name || "").toLowerCase().includes(query);
+}
+function sortMaterials(materials, sortMode) {
+  const arr = materials.slice();
+  if (sortMode === "recent") arr.sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
+  else arr.sort((a, b) => String(a.title).localeCompare(String(b.title), "pl"));
+  return arr;
+}
+
+function renderMy(allFolders, allMaterials) {
   renderMyCrumbs();
+  const query = state.my.query;
+  const folders = allFolders.filter((f) => matchesQuery(f.name, query));
+  const materials = sortMaterials(allMaterials.filter((m) => matchesQuery(m.title, query)), state.my.sort);
   const list = $("#my-list");
   list.innerHTML = "";
-  $("#my-empty").classList.toggle("hidden", folders.length + materials.length > 0);
+  const empty = $("#my-empty");
+  empty.textContent = query && allFolders.length + allMaterials.length > 0
+    ? "Nic nie pasuje do wyszukiwania."
+    : "Pusto tutaj. Dodaj materiał lub folder.";
+  empty.classList.toggle("hidden", folders.length + materials.length > 0);
 
   folders.forEach((f) => {
     const li = document.createElement("li");
@@ -259,7 +392,8 @@ function renderMy(folders, materials) {
       onOpen: () => { state.my.stack.push({ id: f.id, name: f.name, categoryKey: state.my.category }); loadMy(); },
       actions: [
         { glyph: "✕", label: "Usuń folder", danger: true, onClick: async () => {
-          if (!confirm(`Usunąć folder „${f.name}" i jego zawartość?`)) return;
+          const ok = await modalConfirm("Usunąć folder?", `Folder „${f.name}" i cała jego zawartość zostaną usunięte. Tej operacji nie można cofnąć.`, { danger: true, okLabel: "Usuń" });
+          if (!ok) return;
           try { await DB.deleteFolder(f.id); state.my._dirty = true; loadMy(); }
           catch (err) { setLibStatus(err.message, "err"); }
         } },
@@ -279,7 +413,8 @@ function renderMy(folders, materials) {
         { glyph: "↪", label: "Przenieś", onClick: () => openMovePicker(m) },
         { glyph: "✎", label: "Edytuj", onClick: () => editMaterial(m.id) },
         { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
-          if (!confirm(`Usunąć materiał „${m.title}"?`)) return;
+          const ok = await modalConfirm("Usunąć materiał?", `Materiał „${m.title}" zostanie trwale usunięty razem z postępem nauki.`, { danger: true, okLabel: "Usuń" });
+          if (!ok) return;
           try { await DB.deleteMaterial(m.id); loadMy(); }
           catch (err) { setLibStatus(err.message, "err"); }
         } },
@@ -293,18 +428,30 @@ function renderMy(folders, materials) {
 async function loadPublic() {
   setLibStatus("Wczytuję…");
   try {
-    const materials = (await DB.listPublicMaterials()) || [];
-    const list = $("#pub-list");
-    list.innerHTML = "";
-    $("#pub-empty").classList.toggle("hidden", materials.length > 0);
-    materials.forEach((m) => {
+    state.pub.items = (await DB.listPublicMaterials()) || [];
+    renderPublic(state.pub.items);
+    setLibStatus("");
+  } catch (e) { setLibStatus(e.message, "err"); }
+}
+
+function renderPublic(allMaterials) {
+  const query = state.pub.query;
+  const materials = allMaterials.filter((m) => matchesQuery(m.title, query));
+  const list = $("#pub-list");
+  list.innerHTML = "";
+  const empty = $("#pub-empty");
+  empty.textContent = query && allMaterials.length > 0 ? "Nic nie pasuje do wyszukiwania." : "Brak materiałów od autora.";
+  empty.classList.toggle("hidden", materials.length > 0);
+  materials.forEach((m) => {
       const li = document.createElement("li");
       const sub = (m.type === "test" ? "Test ABCD" : "Fiszki") + " · " + fmtDate(m.updated_at);
       const row = libCard({
         kind: "file", icon: m.type === "test" ? "≡" : "❏", name: m.title, sub,
         onOpen: () => openMaterial(m.id),
         actions: [
-          { glyph: "⤓", label: "Kopiuj do moich", onClick: async () => {
+          { glyph: "⤓", label: "Kopiuj do moich", onClick: async (e) => {
+            const btn = e && e.currentTarget;
+            if (btn) btn.disabled = true; // ochrona przed podwójną kopią
             try {
               await ensureCategoryRootFolders();
               const cat = categoryByType(m.type);
@@ -313,14 +460,13 @@ async function loadPublic() {
               setLibStatus(`Skopiowano „${m.title}" do sekcji „${cat ? cat.name : "Moje materiały"}".`, "ok");
             }
             catch (err) { setLibStatus(err.message, "err"); }
+            finally { if (btn) btn.disabled = false; }
           } },
         ],
       });
       li.appendChild(row);
       list.appendChild(li);
-    });
-    setLibStatus("");
-  } catch (e) { setLibStatus(e.message, "err"); }
+  });
 }
 
 /**
@@ -382,14 +528,88 @@ function libCard(o) {
 }
 
 // ── Modal (ogólny) + przenoszenie materiałów do/z folderów ───────────────────
-function openModal(title, buildBody) {
+let _modalDismiss = null; // wywoływane przy każdym zamknięciu (Escape/overlay/Zamknij)
+
+function openModal(title, buildBody, { hideClose = false } = {}) {
   $("#modal-title").textContent = title;
   const body = $("#modal-body");
   body.innerHTML = "";
   buildBody(body);
+  $("#modal-close").classList.toggle("hidden", hideClose);
   $("#modal-overlay").classList.remove("hidden");
 }
-function closeModal() { $("#modal-overlay").classList.add("hidden"); }
+function closeModal() {
+  $("#modal-overlay").classList.add("hidden");
+  const d = _modalDismiss;
+  _modalDismiss = null;
+  if (d) d();
+}
+
+/**
+ * Potwierdzenie w modalu (zamiennik natywnego confirm()).
+ * @returns {Promise<boolean>} true = potwierdzono, false = anulowano/zamknięto.
+ */
+function modalConfirm(title, text, { danger = false, okLabel = "Potwierdź", cancelLabel = "Anuluj" } = {}) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (v) => { if (!settled) { settled = true; resolve(v); } };
+    _modalDismiss = () => settle(false);
+    openModal(title, (body) => {
+      const pEl = document.createElement("p");
+      pEl.className = "modal-sub";
+      pEl.textContent = text;
+      body.appendChild(pEl);
+      const row = document.createElement("div");
+      row.className = "modal-btn-row";
+      const cancel = document.createElement("button");
+      cancel.type = "button"; cancel.className = "btn btn-ghost"; cancel.textContent = cancelLabel;
+      cancel.addEventListener("click", () => closeModal());
+      const ok = document.createElement("button");
+      ok.type = "button"; ok.className = "btn " + (danger ? "btn-danger" : "btn-primary"); ok.textContent = okLabel;
+      ok.addEventListener("click", () => { settle(true); _modalDismiss = null; closeModal(); });
+      row.appendChild(cancel); row.appendChild(ok);
+      body.appendChild(row);
+      setTimeout(() => ok.focus(), 30);
+    }, { hideClose: true });
+  });
+}
+
+/**
+ * Pole tekstowe w modalu (zamiennik natywnego prompt()).
+ * @returns {Promise<string|null>} wpisany tekst albo null przy anulowaniu.
+ */
+function modalPrompt(title, label, { placeholder = "", value = "", okLabel = "OK" } = {}) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (v) => { if (!settled) { settled = true; resolve(v); } };
+    _modalDismiss = () => settle(null);
+    openModal(title, (body) => {
+      const lab = document.createElement("label");
+      lab.className = "field";
+      const span = document.createElement("span");
+      span.textContent = label;
+      const input = document.createElement("input");
+      input.type = "text"; input.className = "text-input";
+      input.placeholder = placeholder; input.value = value;
+      input.maxLength = 120;
+      lab.appendChild(span); lab.appendChild(input);
+      body.appendChild(lab);
+      const row = document.createElement("div");
+      row.className = "modal-btn-row";
+      const cancel = document.createElement("button");
+      cancel.type = "button"; cancel.className = "btn btn-ghost"; cancel.textContent = "Anuluj";
+      cancel.addEventListener("click", () => closeModal());
+      const ok = document.createElement("button");
+      ok.type = "button"; ok.className = "btn btn-primary"; ok.textContent = okLabel;
+      const submit = () => { settle(input.value.trim()); _modalDismiss = null; closeModal(); };
+      ok.addEventListener("click", submit);
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
+      row.appendChild(cancel); row.appendChild(ok);
+      body.appendChild(row);
+      setTimeout(() => input.focus(), 30);
+    }, { hideClose: true });
+  });
+}
 $("#modal-close").addEventListener("click", closeModal);
 $("#modal-overlay").addEventListener("click", (e) => { if (e.target === $("#modal-overlay")) closeModal(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#modal-overlay").classList.contains("hidden")) closeModal(); });
@@ -447,7 +667,7 @@ function openMovePicker(m) {
     nf.className = "move-newfolder";
     nf.textContent = "+ Nowy folder tutaj";
     nf.addEventListener("click", async () => {
-      const name = (prompt("Nazwa nowego folderu:") || "").trim();
+      const name = await modalPrompt("Nowy folder", "Nazwa folderu", { placeholder: "np. Kolokwium 2", okLabel: "Utwórz" });
       if (!name) return;
       try {
         const created = await DB.createFolder(name, rootId);
@@ -471,11 +691,24 @@ async function doMove(m, folderId) {
 
 $("#btn-new-folder").addEventListener("click", async () => {
   if (!state.my.category) return setLibStatus("Najpierw wybierz sekcję: Fiszki albo Testy ABCD.", "err");
-  const name = (prompt("Nazwa folderu:") || "").trim();
+  const name = await modalPrompt("Nowy folder", "Nazwa folderu", { placeholder: "np. Wykład 3", okLabel: "Utwórz" });
   if (!name) return;
   try { await DB.createFolder(name, curFolderId()); state.my._dirty = true; loadMy(); }
   catch (e) { setLibStatus(e.message, "err"); }
 });
+$("#my-search").addEventListener("input", (e) => {
+  state.my.query = e.target.value.trim().toLowerCase();
+  renderMy(state.my.lastFolders, state.my.lastMaterials);
+});
+$("#my-sort").addEventListener("change", (e) => {
+  state.my.sort = e.target.value;
+  renderMy(state.my.lastFolders, state.my.lastMaterials);
+});
+$("#pub-search").addEventListener("input", (e) => {
+  state.pub.query = e.target.value.trim().toLowerCase();
+  renderPublic(state.pub.items);
+});
+
 $("#btn-new-material").addEventListener("click", () => {
   if (!state.my.category) return setLibStatus("Najpierw wybierz sekcję: Fiszki albo Testy ABCD.", "err");
   editMaterial(null);
@@ -484,10 +717,7 @@ $("#btn-new-material").addEventListener("click", () => {
 // ════════════════════════════════════════════════════════════════════════════
 //  EDYTOR
 // ════════════════════════════════════════════════════════════════════════════
-function setEdStatus(msg, kind = "") {
-  $("#ed-status").textContent = msg;
-  $("#ed-status").className = "status" + (kind ? " " + kind : "");
-}
+const setEdStatus = makeStatus("#ed-status");
 
 function populateFolderSelect(catKey, selectedId) {
   const sel = $("#ed-folder");
@@ -509,9 +739,21 @@ function populateFolderSelect(catKey, selectedId) {
   });
 }
 
+let editorDirty = false;
+function markEditorDirty() { editorDirty = true; }
+["#ed-title", "#ed-content"].forEach((sel) => $(sel).addEventListener("input", markEditorDirty));
+["#ed-type", "#ed-folder"].forEach((sel) => $(sel).addEventListener("change", markEditorDirty));
+
+// Ostrzeżenie przeglądarki przy zamykaniu karty z niezapisanym materiałem.
+window.addEventListener("beforeunload", (e) => {
+  const editorActive = $(".screen.is-active") && $(".screen.is-active").id === "screen-editor";
+  if (editorActive && editorDirty) { e.preventDefault(); e.returnValue = ""; }
+});
+
 async function editMaterial(id) {
   const cat = categoryByKey(state.my.category);
   state.editing = { id: id, folderId: curFolderId(), categoryKey: state.my.category };
+  editorDirty = false;
   setEdStatus("");
   if (id) {
     $("#editor-title").textContent = "Edytuj materiał";
@@ -544,7 +786,9 @@ async function saveMaterial() {
   const cat = state.editing ? categoryByKey(state.editing.categoryKey) : null;
   if (!title) return setEdStatus("Podaj tytuł.", "err");
   if (!content.trim()) return setEdStatus("Treść jest pusta.", "err");
-  if (content.length > MAX_CONTENT_BYTES) return setEdStatus("Treść jest za duża (limit 5 MB).", "err");
+  // Blob liczy prawdziwe bajty UTF-8 (content.length liczy znaki UTF-16 — polskie
+  // znaki i emoji zajmują więcej bajtów niż znaków).
+  if (new Blob([content]).size > MAX_CONTENT_BYTES) return setEdStatus("Treść jest za duża (limit 5 MB).", "err");
   if (type === "auto") type = cat ? cat.type : JLP.detectMaterialType(content);
   if (type !== "test" && type !== "flashcards") {
     return setEdStatus("Nie rozpoznano formatu. Test: Q:/A:/B:/C:/D:/CORRECT: (kilka poprawnych: CORRECT: A, C) — Fiszki: przód;tył", "err");
@@ -556,29 +800,44 @@ async function saveMaterial() {
   if (!items.length) return setEdStatus("Nie udało się odczytać żadnej pozycji z treści.", "err");
 
   setEdStatus("Zapisuję…");
+  $("#btn-ed-save").disabled = true; // ochrona przed podwójnym kliknięciem = duplikatem materiału
   try {
     if (state.editing.id) await DB.updateMaterial(state.editing.id, { title, type, content, folder_id: folderId });
     else await DB.createMaterial({ title, type, content, folderId });
     setEdStatus("");
+    editorDirty = false;
     state.my._dirty = true;
     showScreen("screen-library");
     loadMy();
   } catch (e) { setEdStatus(e.message, "err"); }
+  finally { $("#btn-ed-save").disabled = false; }
 }
 
 $("#btn-ed-save").addEventListener("click", saveMaterial);
-$("#btn-ed-cancel").addEventListener("click", () => showScreen("screen-library"));
-$("#btn-ed-sample-test").addEventListener("click", () => { $("#ed-content").value = SAMPLE_TEST; $("#ed-type").value = "test"; });
-$("#btn-ed-sample-cards").addEventListener("click", () => { $("#ed-content").value = SAMPLE_CARDS; $("#ed-type").value = "flashcards"; });
+$("#btn-ed-cancel").addEventListener("click", async () => {
+  if (editorDirty) {
+    const ok = await modalConfirm("Odrzucić zmiany?", "Masz niezapisane zmiany w tym materiale. Wyjść bez zapisywania?", { danger: true, okLabel: "Odrzuć zmiany" });
+    if (!ok) return;
+  }
+  editorDirty = false;
+  showScreen("screen-library");
+});
+$("#btn-ed-sample-test").addEventListener("click", () => { $("#ed-content").value = SAMPLE_TEST; $("#ed-type").value = "test"; markEditorDirty(); });
+$("#btn-ed-sample-cards").addEventListener("click", () => { $("#ed-content").value = SAMPLE_CARDS; $("#ed-type").value = "flashcards"; markEditorDirty(); });
 $("#ed-file").addEventListener("change", (e) => {
-  const f = e.target.files[0];
+  const input = e.target;
+  const f = input.files && input.files[0];
+  input.value = ""; // pozwala wybrać ten sam plik ponownie po poprawce
   if (!f) return;
   if (f.size > MAX_CONTENT_BYTES) return setEdStatus("Plik za duży (limit 5 MB).", "err");
   const r = new FileReader();
   r.onload = () => {
     $("#ed-content").value = String(r.result);
     if (!$("#ed-title").value.trim()) $("#ed-title").value = f.name.replace(/\.[^.]+$/, "");
+    markEditorDirty();
+    setEdStatus("Wczytano plik „" + f.name + "”.", "ok");
   };
+  r.onerror = () => setEdStatus("Nie udało się odczytać pliku. Sprawdź, czy to plik tekstowy.", "err");
   r.readAsText(f, "utf-8");
 });
 
@@ -645,6 +904,7 @@ async function loadModeProgress(mode) {
   if (mode === "przeglad" || !DB.isConfigured() || !state.material.id) { line.textContent = ""; line.classList.remove("done"); resetBtn.classList.add("hidden"); return; }
   line.textContent = "Ładuję postęp…";
   try {
+    await flushProgress(); // najpierw domknij zaległe zapisy, żeby licznik był aktualny
     const rows = await DB.listProgress(state.material.id, mode);
     if (state.ready.mode !== mode) return; // zmieniono tryb w międzyczasie
     const passed = new Set((rows || []).filter((r) => r.passed).map((r) => r.card_key));
@@ -713,11 +973,70 @@ function cardKey(front, back) { return _fnv1a(_norm(front) + "\u0001" + _norm(ba
 function testKey(q) { return cardKey(q.question, q.answers[q.correctIndex]); }
 function flashKey(c) { return cardKey(c.front, c.back); }
 
+// ── Buforowany zapis postępu ──────────────────────────────────────────────────
+// Zamiast osobnego żądania HTTP po każdej ocenie karty (dziesiątki wywołań w
+// szybkiej sesji) zbieramy wiersze i wysyłamy paczkę: po 1,2 s ciszy, przy
+// wyjściu z sesji oraz przy zamykaniu/chowaniu karty przeglądarki (keepalive).
+const progressBuffer = new Map(); // "materiał|tryb|karta" → wiersz (deduplikacja)
+let progressFlushTimer = null;
+const PENDING_KEY = "jl_pending_progress";
+
+/** Bufor trafia też do localStorage — niewysłany postęp przeżyje odświeżenie/zamknięcie strony. */
+function persistBufferLocally() {
+  try {
+    if (progressBuffer.size) localStorage.setItem(PENDING_KEY, JSON.stringify(Array.from(progressBuffer.values())));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch (_) {}
+}
+function restorePendingProgress() {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return;
+    const rows = JSON.parse(raw);
+    if (Array.isArray(rows)) {
+      for (const r of rows) {
+        if (r && r.material_id && r.card_key && r.mode) {
+          progressBuffer.set(r.material_id + "|" + r.mode + "|" + r.card_key, r);
+        }
+      }
+      if (progressBuffer.size) flushProgress();
+    }
+  } catch (_) {}
+}
+
 function persistProgress(mode, rows) {
   if (!DB.isConfigured() || typeof DB.upsertProgress !== "function" || !state.material || !state.material.id || !rows.length) return;
   const mid = state.material.id;
-  DB.upsertProgress(rows.map((r) => ({ material_id: mid, card_key: r.card_key, mode, passed: r.passed !== false, difficulty: r.difficulty }))).catch(() => {});
+  for (const r of rows) {
+    progressBuffer.set(mid + "|" + mode + "|" + r.card_key, {
+      material_id: mid, card_key: r.card_key, mode, passed: r.passed !== false, difficulty: r.difficulty,
+    });
+  }
+  persistBufferLocally();
+  clearTimeout(progressFlushTimer);
+  progressFlushTimer = setTimeout(() => flushProgress(), 1200);
 }
+
+function flushProgress({ keepalive = false } = {}) {
+  clearTimeout(progressFlushTimer);
+  if (!progressBuffer.size) return Promise.resolve();
+  const rows = Array.from(progressBuffer.values());
+  progressBuffer.clear();
+  return DB.upsertProgress(rows, { keepalive })
+    .then(() => persistBufferLocally())
+    .catch((e) => {
+      // Nie udało się (np. brak sieci) — wracamy do bufora, spróbujemy przy następnym flushu.
+      for (const r of rows) progressBuffer.set(r.material_id + "|" + r.mode + "|" + r.card_key, r);
+      persistBufferLocally();
+      console.warn("Zapis postępu odłożony:", e && e.message);
+    });
+}
+
+// Ostatnia szansa na zapis, gdy użytkownik zamyka/chowa kartę.
+window.addEventListener("pagehide", () => flushProgress({ keepalive: true }));
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushProgress({ keepalive: true });
+});
 
 function allDoneNotice() {
   const line = $("#ready-progress");
@@ -759,13 +1078,14 @@ $("#btn-reset-progress").addEventListener("click", () => {
 });
 async function doReset(mode, label) {
   const what = mode ? `tryb „${label}”` : "wszystkie tryby";
-  if (!window.confirm(`Zresetować postęp — ${what}? Tej operacji nie można cofnąć.`)) return;
+  const ok = await modalConfirm("Resetować postęp?", `Zaliczenia (${what}) zostaną wyczyszczone. Tej operacji nie można cofnąć.`, { danger: true, okLabel: "Resetuj" });
+  if (!ok) return;
   try {
     await DB.resetProgress(state.material.id, mode);
     $("#reset-panel").classList.add("hidden");
     $("#ready-progress").classList.remove("done");
     loadModeProgress(state.mode);
-  } catch (e) { alert("Nie udało się zresetować: " + e.message); }
+  } catch (e) { showToast("Nie udało się zresetować: " + e.message); }
 }
 
 // ── Start sesji — dyspozytor trybu (z pominięciem zaliczonych) ────────────────
@@ -987,7 +1307,14 @@ function checkExam() {
 }
 function nextExam() { const t = state.test; if (!t.locked && t.pos < t.queue.length) return; t.pos++; renderExam(); }
 function skipExam() { const t = state.test; if (t.locked) return; t.wrong.push(t.queue[t.pos]); t.pos++; renderExam(); }
-function deleteExam() { const t = state.test; t.queue.splice(t.pos, 1); t.total = t.queue.length; if (t.total === 0) return finishExam(); renderExam(); }
+function deleteExam() {
+  const t = state.test;
+  if (!t || t.locked) return; // po odpowiedzi usuwanie wypaczałoby wynik (np. 3/2 poprawnych)
+  t.queue.splice(t.pos, 1);
+  t.total = t.queue.length;
+  if (t.total === 0 || t.pos >= t.queue.length) return finishExam();
+  renderExam();
+}
 function finishExam() {
   const t = state.test;
   const wrongKeys = new Set(t.wrong.map((q) => testKey(q)));
@@ -1005,7 +1332,7 @@ function finishExam() {
 $("#btn-test-next").addEventListener("click", nextExam);
 $("#btn-test-skip").addEventListener("click", skipExam);
 $("#btn-test-delete").addEventListener("click", deleteExam);
-$("#btn-test-quit").addEventListener("click", () => showScreen("screen-library"));
+$("#btn-test-quit").addEventListener("click", () => { flushProgress(); showScreen("screen-library"); });
 $("#btn-test-check").addEventListener("click", () => {
   if (state.testScreenMode === "exam") checkExam();
   else if (state.testScreenMode === "classic") checkClassic();
@@ -1195,6 +1522,7 @@ function startBrowse(cards, { shuffle = true } = {}) {
 }
 function renderBrowse() {
   const s = state.browse;
+  if (!s || !s.cards.length) return showScreen("screen-library");
   const c = s.cards[s.idx];
   $("#flash-card").classList.toggle("flipped", s.flipped);
   $("#flash-front-text").textContent = c.front;
@@ -1227,7 +1555,7 @@ $("#btn-flash-prev").addEventListener("click", browsePrev);
 $("#btn-flash-next").addEventListener("click", browseNext);
 $("#btn-flash-skip").addEventListener("click", skipGrade);
 $("#btn-flash-delete").addEventListener("click", deleteGradeCard);
-$("#btn-flash-quit").addEventListener("click", () => showScreen("screen-library"));
+$("#btn-flash-quit").addEventListener("click", () => { flushProgress(); showScreen("screen-library"); });
 
 // ════════════════════════════════════════════════════════════════════════════
 //  WYNIKI
@@ -1243,19 +1571,34 @@ function showResults({ pct, title, line, color, wrong, onRetryWrong, onRetryAll 
   wb.innerHTML = "";
   if (wrong && wrong.length) {
     const h = document.createElement("p");
-    h.style.fontWeight = "600"; h.style.margin = "0 0 4px"; h.textContent = "Do powtórki:";
+    h.style.fontWeight = "600"; h.style.margin = "0 0 4px"; h.textContent = `Do powtórki (${wrong.length}):`;
     wb.appendChild(h);
-    wrong.forEach((w) => {
-      const d = document.createElement("div");
-      d.className = "wrong-item";
-      d.innerHTML = `<p class="wrong-q">${escapeHtml(w.question)}</p><p class="wrong-a">✓ ${escapeHtml(w.answer)}</p>`;
-      wb.appendChild(d);
-    });
+    const WRONG_PAGE = 100; // przy setkach błędnych nie budujemy tysięcy węzłów DOM naraz
+    const appendItems = (from, to) => {
+      const frag = document.createDocumentFragment();
+      wrong.slice(from, to).forEach((w) => {
+        const d = document.createElement("div");
+        d.className = "wrong-item";
+        d.innerHTML = `<p class="wrong-q">${escapeHtml(w.question)}</p><p class="wrong-a">✓ ${escapeHtml(w.answer)}</p>`;
+        frag.appendChild(d);
+      });
+      wb.appendChild(frag);
+    };
+    appendItems(0, WRONG_PAGE);
+    if (wrong.length > WRONG_PAGE) {
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "btn btn-ghost btn-sm wrong-more";
+      more.textContent = `Pokaż pozostałe (${wrong.length - WRONG_PAGE})`;
+      more.addEventListener("click", () => { more.remove(); appendItems(WRONG_PAGE, wrong.length); }, { once: true });
+      wb.appendChild(more);
+    }
   }
   const rw = $("#btn-retry-wrong");
   if (onRetryWrong) { rw.classList.remove("hidden"); rw.onclick = onRetryWrong; }
   else rw.classList.add("hidden");
   $("#btn-retry-all").onclick = onRetryAll || (() => showScreen("screen-library"));
+  flushProgress(); // koniec sesji = domknięcie zapisu postępu
   showScreen("screen-results");
 }
 $("#btn-results-home").addEventListener("click", () => { showScreen("screen-library"); loadMy(); });
@@ -1266,6 +1609,7 @@ document.addEventListener("keydown", (e) => {
   if (active === "screen-test") {
     if (state.testScreenMode === "exam") {
       const t = state.test;
+      if (!t || t.pos >= t.queue.length) return;
       const cur = t.queue[t.pos];
       if (["1", "2", "3", "4"].includes(e.key) && !t.locked) {
         const idx = Number(e.key) - 1;
@@ -1275,6 +1619,7 @@ document.addEventListener("keydown", (e) => {
       else if (e.key.toLowerCase() === "s" && !t.locked) { e.preventDefault(); skipExam(); }
     } else if (state.testScreenMode === "classic") {
       const c = state.classic;
+      if (!c) return;
       const e0 = c.queue[0];
       if (e0 && e0.mode === "abcd" && ["1", "2", "3", "4"].includes(e.key) && !c.locked) {
         const idx = Number(e.key) - 1;
@@ -1337,5 +1682,13 @@ const SAMPLE_CARDS = `bodziec warunkowy;bodziec, który po skojarzeniu wywołuje
 walidacja;stopień, w jakim test mierzy to, co ma mierzyć;psychometria
 rzetelność;spójność i powtarzalność pomiaru;psychometria`;
 
+// ── PWA: service worker (offline shell + instalacja na ekranie głównym) ──────
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW:", e && e.message));
+  });
+}
+
 // Start
+restorePendingProgress();
 initApp();

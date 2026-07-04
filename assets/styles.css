@@ -1539,3 +1539,81 @@ select.text-input {
   overflow-y: auto;
 }
 .explain-text.explain-empty { color: var(--muted); font-size: 0.9rem; }
+
+/* ── Toast — komunikaty o nieoczekiwanych błędach (globalna siatka bezpieczeństwa) ── */
+.jl-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translate(-50%, 16px);
+  max-width: min(92vw, 480px);
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 1200;
+}
+.jl-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.jl-toast.err { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad-soft), var(--shadow-sm); }
+.jl-toast.ok { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok-soft), var(--shadow-sm); }
+
+/* Przycisk „Pokaż pozostałe" na ekranie wyników przy setkach błędnych pytań */
+.wrong-more { margin-top: 10px; width: 100%; }
+
+/* ── v11: modale potwierdzeń, wyszukiwarka biblioteki, reset hasła ─────────── */
+
+/* Pełny (nie-ghost) przycisk destrukcyjny — używany w modalach potwierdzeń */
+.btn-danger {
+  background: var(--bad);
+  color: #fff;
+  border: 1px solid transparent;
+}
+.btn-danger:hover { filter: brightness(1.08); }
+
+/* Rząd przycisków w modalConfirm / modalPrompt */
+.modal-btn-row {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.modal-btn-row .btn { min-width: 110px; }
+
+/* Wyszukiwarka + sortowanie w bibliotece */
+.lib-tools {
+  display: flex;
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+.lib-search { flex: 1; min-width: 0; }
+.lib-sort { flex: 0 0 auto; width: auto; max-width: 46%; }
+@media (max-width: 480px) {
+  .lib-tools { flex-wrap: wrap; }
+  .lib-sort { flex: 1 1 100%; max-width: none; }
+}
+
+/* Reset hasła na ekranie logowania */
+.auth-forgot {
+  align-self: flex-start;
+  padding-left: 0;
+  margin-top: -4px;
+  font-size: 0.88rem;
+}
+.recovery-box {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.recovery-info { margin: 0; font-size: 0.92rem; color: var(--muted); }

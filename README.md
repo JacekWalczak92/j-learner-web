@@ -20,6 +20,14 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   - fiszki: **Nauka** (przerabiasz całość, karta wraca aż „Łatwe") i **Przegląd**
     (szybka powtórka — „Dobre" lub „Łatwe" kończy kartę).
 - Skróty klawiszowe: ABCD `1`–`4`, `Enter`, `S`; oceny fiszek `Spacja`, `1`–`4`.
+- **Wyszukiwarka i sortowanie** w bibliotece (filtr po tytule, Nazwa A–Z / Ostatnio zmienione).
+- **Reset hasła** — link „Nie pamiętasz hasła?" wysyła e-mail; po kliknięciu w link
+  ustawiasz nowe hasło i logujesz się automatycznie. Wymaga ustawienia **Site URL**
+  w Supabase (Authentication → URL Configuration) na adres wdrożonej strony.
+- **PWA** — aplikację można zainstalować na ekranie głównym telefonu (manifest + ikony);
+  service worker cache'uje shell aplikacji, więc otwiera się także offline.
+- **Odporny zapis postępu** — oceny kart są buforowane i wysyłane paczkami; niewysłany
+  postęp trafia do localStorage i dosyła się po powrocie sieci lub ponownym otwarciu.
 - **Zapis postępu** — co zaliczysz w danym trybie, zapisuje się na koncie (Supabase).
   Kolejna sesja rusza od niezaliczonych. Postęp jest **osobny dla każdego trybu** i można
   go **zresetować** (na ekranie startu): dla testów *Quiz klasyczny / Sesja testowa /
@@ -45,6 +53,8 @@ Pełna instrukcja: **`supabase/README.md`**. W skrócie:
 2. **SQL Editor** → wklej `supabase/schema.sql` → **Run** (tworzy tabele + reguły RLS).
 3. **Project Settings → API** → skopiuj *Project URL* i *anon key* do `assets/config.js`.
 4. (Na start) wyłącz potwierdzanie e-maila w **Authentication → Providers → Email**.
+5. Dla resetu hasła: **Authentication → URL Configuration → Site URL** ustaw na adres
+   strony (np. `https://twojlogin.github.io/j-learner-web/`) — tam trafia link z e-maila.
 
 `anon key` jest publiczny z założenia — bezpieczeństwa pilnują reguły **RLS** w bazie
 (każdy widzi tylko swoje dane; materiały publiczne czyta każdy; zwykły użytkownik nie
@@ -55,6 +65,19 @@ może nic opublikować globalnie).
 To czysta statyka — **Settings → Pages → Deploy from a branch** (`main`, katalog `/root`).
 Plik `assets/config.js` możesz spokojnie zacommitować (zawiera tylko publiczny URL i anon
 key). Po wypchnięciu na `main` strona aktualizuje się sama.
+
+## Wydanie nowej wersji (checklist)
+
+Frontend to moduły ES z cache-bustingiem `?v=N` oraz service worker z własną wersją cache.
+Przy każdym wydaniu podbij numer wersji w **czterech** miejscach:
+
+1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
+2. `assets/app.js` — `?v=N` w importach `parsers.js` i `supabase.js` (i stała `APP_VERSION`),
+3. `assets/supabase.js` — `?v=N` w imporcie `config.js`,
+4. `sw.js` — stała `VERSION` (zmienia nazwę cache i wymusza odświeżenie shellu).
+
+Szybka weryfikacja: `grep -rn "?v=" index.html assets/*.js sw.js` — wszystkie wpisy
+powinny mieć ten sam numer.
 
 ## Publikowanie materiałów „od autora" (Twoje API)
 

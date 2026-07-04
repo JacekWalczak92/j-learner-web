@@ -8,7 +8,7 @@
 //
 //  Schemat bazy i instrukcja: katalog supabase/.
 // ============================================================================
-window.JL_CONFIG = {
+export const JL_CONFIG = {
   supabaseUrl: "https://sztwcvqivqynvksxsqtj.supabase.co",
   supabaseAnonKey: "sb_publishable_lJLH18BWTNy2eUw-Sl0xEg_UqovSBwS",  // ← wklej tutaj anon public key
 };
