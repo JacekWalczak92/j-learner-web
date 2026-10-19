@@ -8,10 +8,10 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=12";
-import { JLDB as DB } from "./supabase.js?v=12";
+import { JLParsers as JLP } from "./parsers.js?v=11";
+import { JLDB as DB } from "./supabase.js?v=11";
 
-const APP_VERSION = "12";
+const APP_VERSION = "11";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -135,7 +135,6 @@ async function enterApp() {
   showScreen("screen-library");
   await seedDefaultFolders();
   switchTab("mine");
-  importPendingPhoneWords();
 }
 
 /** Zapewnia dwa główne katalogi-sekcje: „Fiszki” oraz „Testy ABCD”. */
@@ -1690,80 +1689,6 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   });
 }
 
-// ── Import słówek z telefonu (J-Learner Vocabulary, format `slownik-words` v1) ──
-// „Wyślij do J-Learner” w telefonie otwiera stronę z `#import=<base64url JSON>`.
-// Fragment adresu nie trafia do serwera; zapamiętujemy go do zalogowania i
-// dopisujemy słówka jako fiszki do „Fiszki › Moje słówka › Słówka z telefonu”.
-const WORDS_PENDING_KEY = "jl_pending_words";
-const WORDS_FOLDER = "Moje słówka";
-const WORDS_MATERIAL = "Słówka z telefonu";
-
-function capturePhoneWordsFromHash() {
-  const m = /(?:^#|&)import=([^&]+)/.exec(window.location.hash || "");
-  if (!m) return;
-  try { history.replaceState(null, "", window.location.pathname + window.location.search); } catch (_) {}
-  try { localStorage.setItem(WORDS_PENDING_KEY, m[1]); } catch (_) {}
-}
-
-function decodePhoneWords(payload) {
-  const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
-  const data = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
-  if (!data || data.format !== "slownik-words" || !Array.isArray(data.words)) throw new Error("format");
-  const clean = (v) => String(v == null ? "" : v).replace(/[;\r\n\t]+/g, ", ").replace(/\s+/g, " ").trim();
-  return data.words
-    .map((w) => ({ front: clean(w && w.english), back: clean(w && w.polish), day: String((w && w.lookedUpAt) || "").slice(0, 10) }))
-    .filter((w) => w.front && w.back);
-}
-
-async function importPendingPhoneWords() {
-  let payload = null;
-  try { payload = localStorage.getItem(WORDS_PENDING_KEY); } catch (_) {}
-  if (!payload || !DB.getUser()) return;
-  try { localStorage.removeItem(WORDS_PENDING_KEY); } catch (_) {}
-  let words;
-  try { words = decodePhoneWords(payload); } catch (_) { return showToast("Nie udało się odczytać słówek z telefonu."); }
-  if (!words.length) return showToast("Link z telefonu nie zawiera słówek.");
-  const ok = await modalConfirm(
-    "Słówka z telefonu",
-    `Dodać ${words.length} słówek do fiszek (Fiszki › ${WORDS_FOLDER} › ${WORDS_MATERIAL})?`,
-    { okLabel: "Dodaj" }
-  );
-  if (!ok) return;
-  try {
-    if (!getCategoryFolder("flashcards")) await ensureCategoryRootFolders();
-    const root = getCategoryFolder("flashcards");
-    if (!root) throw new Error("Brak folderu „Fiszki”.");
-    const folders = (await DB.listFolders()) || [];
-    let folder = folders.find((f) => f.parent_id === root.id && normName(f.name) === normName(WORDS_FOLDER));
-    if (!folder) folder = await DB.createFolder(WORDS_FOLDER, root.id);
-    const mats = (await DB.listMyMaterials(folder.id)) || [];
-    const found = mats.find((x) => x.type === "flashcards" && normName(x.title) === normName(WORDS_MATERIAL));
-    const material = found ? await DB.getMaterial(found.id) : null;
-    const content = (material && material.content) || "";
-    const seen = new Set(JLP.parseFlashcardText(content).map((c) => normName(c.front).replace(/\s+/g, " ")));
-    const lines = [];
-    for (const w of words) {
-      const key = normName(w.front).replace(/\s+/g, " ");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      lines.push(w.day ? `${w.front};${w.back};${w.day}` : `${w.front};${w.back}`);
-    }
-    if (!lines.length) return showToast("Wszystkie słówka już są w fiszkach.", "ok");
-    const next = (content.trim() ? content.replace(/\s+$/, "") + "\n" : "") + lines.join("\n") + "\n";
-    if (new Blob([next]).size > MAX_CONTENT_BYTES) throw new Error("Materiał przekroczyłby limit 5 MB.");
-    if (material) await DB.updateMaterial(material.id, { content: next });
-    else await DB.createMaterial({ title: WORDS_MATERIAL, type: "flashcards", content: next, folderId: folder.id });
-    const skipped = words.length - lines.length;
-    showToast(`Dodano ${lines.length} słówek` + (skipped ? ` (pominięto ${skipped} powtórzeń).` : "."), "ok");
-    state.my._dirty = true;
-    loadMy();
-  } catch (e) {
-    showToast("Nie udało się zapisać słówek: " + ((e && e.message) || e));
-  }
-}
-
 // Start
-capturePhoneWordsFromHash();
 restorePendingProgress();
 initApp();

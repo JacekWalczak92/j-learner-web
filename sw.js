@@ -14,7 +14,7 @@
 //  UWAGA przy wydaniu nowej wersji: podbij VERSION razem z ?v= w index.html.
 // ============================================================================
 
-const VERSION = "12";
+const VERSION = "11";
 const CACHE_NAME = "jl-shell-v" + VERSION;
 
 const SHELL = [

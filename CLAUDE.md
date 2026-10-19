@@ -89,7 +89,7 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **12**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **11**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
 2. `assets/app.js` — `?v=N` w importach `parsers.js` i `supabase.js` oraz `APP_VERSION`,
