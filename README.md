@@ -19,6 +19,10 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
     (pokaż odpowiedź → Powtórz / Trudne / Dobre / Łatwe);
   - fiszki: **Nauka** (przerabiasz całość, karta wraca aż „Łatwe") i **Przegląd**
     (szybka powtórka — „Dobre" lub „Łatwe" kończy kartę).
+- **Słówka z telefonu** — w aplikacji J-Learner Vocabulary (Android) *Historia → Eksportuj →
+  Wyślij do J-Learner* otwiera tę stronę z linkiem `#import=…` (format `slownik-words` v1).
+  Po potwierdzeniu słówka trafiają jako fiszki do **Fiszki › Moje słówka › Słówka z telefonu**
+  (`angielski;polski;data`), bez powtórzeń. Gdy nie jesteś zalogowany, import czeka do logowania.
 - Skróty klawiszowe: ABCD `1`–`4`, `Enter`, `S`; oceny fiszek `Spacja`, `1`–`4`.
 - **Wyszukiwarka i sortowanie** w bibliotece (filtr po tytule, Nazwa A–Z / Ostatnio zmienione).
 - **Reset hasła** — link „Nie pamiętasz hasła?" wysyła e-mail; po kliknięciu w link
