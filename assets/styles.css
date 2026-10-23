@@ -775,6 +775,35 @@ select.text-input {
 .lib-action.danger { color: var(--bad); border-color: rgba(255, 107, 89, 0.30); }
 .lib-action.danger:hover { background: var(--bad-soft); border-color: rgba(255, 107, 89, 0.55); }
 .lib-action-ico { font-size: 1rem; line-height: 1; }
+/* ── Zakładka Audio ── */
+.audio-folder {
+  margin: 22px 0 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.audio-folder + .lib-list { margin-top: 10px; }
+.lib-rowwrap.is-playing { border-color: var(--indigo); }
+.audio-player {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--elevated);
+  box-shadow: var(--shadow-sm), var(--shadow-ring);
+}
+.audio-player.hidden { display: none; }
+.audio-now { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.audio-now-label { color: var(--muted); font-size: 0.78rem; font-weight: 700; }
+.audio-now-title { font-weight: 790; overflow-wrap: anywhere; }
+.audio-player audio { width: 100%; }
+.audio-controls { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.audio-rate { width: auto; min-height: 38px; padding: 6px 10px; }
+
 .lib-empty {
   margin: 18px 0 0;
   padding: 30px 18px;

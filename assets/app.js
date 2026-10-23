@@ -8,10 +8,10 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=11";
-import { JLDB as DB } from "./supabase.js?v=11";
+import { JLParsers as JLP } from "./parsers.js?v=12";
+import { JLDB as DB } from "./supabase.js?v=12";
 
-const APP_VERSION = "11";
+const APP_VERSION = "12";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -27,6 +27,7 @@ const state = {
     lastFolders: [], lastMaterials: [], // ostatnio pobrane dane bieżącego widoku (filtr bez refetch)
   },
   pub: { items: [], query: "" },
+  audio: { items: [], query: "", current: null, queue: [] },
   editing: null,
 };
 
@@ -194,6 +195,7 @@ async function doSignUp() {
 }
 
 function doSignOut() {
+  stopAudio();
   DB.signOut();
   $("#user-box").classList.add("hidden");
   showScreen("screen-auth");
@@ -266,8 +268,10 @@ function switchTab(tab) {
   $$('.source-tab[data-tab]').forEach((t) => t.classList.toggle("is-active", t.dataset.tab === tab));
   $("#tab-mine").classList.toggle("hidden", tab !== "mine");
   $("#tab-public").classList.toggle("hidden", tab !== "public");
+  $("#tab-audio").classList.toggle("hidden", tab !== "audio");
   setLibStatus("");
   if (tab === "mine") loadMy();
+  else if (tab === "audio") loadAudio();
   else loadPublic();
 }
 $$('.source-tab[data-tab]').forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
@@ -474,6 +478,144 @@ function renderPublic(allMaterials) {
  * @param {{kind:string, icon:string, name:string, sub?:string, onOpen?:Function,
  *          actions?:Array<{glyph:string,label:string,onClick:Function,danger?:boolean}>}} o
  */
+// ════════════════════════════════════════════════════════════════════════════
+//  AUDIO — MP3 wysłane z aplikacji mobilnej (AI Lab → „Wyślij MP3 do J-Learner web")
+// ════════════════════════════════════════════════════════════════════════════
+async function loadAudio() {
+  setLibStatus("Wczytuję…");
+  try {
+    state.audio.items = (await DB.listAudio()) || [];
+    renderAudio(state.audio.items);
+    setLibStatus("");
+  } catch (e) {
+    const m = String(e.message || "");
+    // Brak tabeli = schema.sql bez sekcji audio nie został jeszcze uruchomiony w Supabase.
+    if (/audio_files/i.test(m)) setLibStatus("Zakładka Audio wymaga aktualizacji bazy: uruchom supabase/schema.sql w Supabase SQL Editor.", "err");
+    else setLibStatus(m, "err");
+  }
+}
+
+function fmtSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1).replace(".", ",") + " MB";
+  return Math.max(1, Math.round(n / 1024)) + " KB";
+}
+
+function renderAudio(allItems) {
+  const query = state.audio.query;
+  const items = allItems.filter((a) => matchesQuery(a.title, query) || matchesQuery(a.folder, query));
+  const box = $("#audio-list");
+  box.innerHTML = "";
+  const empty = $("#audio-empty");
+  empty.textContent = query && allItems.length > 0
+    ? "Nic nie pasuje do wyszukiwania."
+    : "Brak nagrań. W aplikacji mobilnej (AI Lab) utwórz MP3 i wybierz „Wyślij MP3 do J-Learner web”.";
+  empty.classList.toggle("hidden", items.length > 0);
+
+  // Kolejność odtwarzania = kolejność na liście (folder, potem tytuł; rozdziały numerycznie).
+  const groups = new Map();
+  items.forEach((a) => {
+    const key = a.folder || "";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(a);
+  });
+  const coll = new Intl.Collator("pl", { numeric: true });
+  const keys = Array.from(groups.keys()).sort((a, b) => (!a) - (!b) || coll.compare(a, b)); // „Bez folderu" na końcu
+  state.audio.queue = [];
+  keys.forEach((key) => {
+    const list = groups.get(key).sort((a, b) => coll.compare(a.title, b.title));
+    state.audio.queue.push(...list);
+    const h = document.createElement("h3");
+    h.className = "audio-folder";
+    h.textContent = key || "Bez folderu";
+    box.appendChild(h);
+    const ul = document.createElement("ul");
+    ul.className = "lib-list";
+    list.forEach((a) => {
+      const li = document.createElement("li");
+      const playing = state.audio.current && state.audio.current.id === a.id;
+      const row = libCard({
+        kind: "file", icon: playing ? "▶" : "♪", name: a.title,
+        sub: fmtSize(a.size_bytes) + " · " + fmtDate(a.updated_at || a.created_at),
+        onOpen: () => playAudio(a),
+        actions: [
+          { glyph: "⤓", label: "Pobierz MP3", onClick: async () => {
+            try {
+              const url = await DB.audioUrl(a.path, a.title + ".mp3");
+              const link = document.createElement("a");
+              link.href = url; link.rel = "noopener";
+              document.body.appendChild(link); link.click(); link.remove();
+            } catch (err) { setLibStatus(err.message, "err"); }
+          } },
+          { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
+            const ok = await modalConfirm("Usunąć nagranie?", `Nagranie „${a.title}" zostanie usunięte z J-Learner web.`, { danger: true, okLabel: "Usuń" });
+            if (!ok) return;
+            try {
+              await DB.deleteAudio(a);
+              if (state.audio.current && state.audio.current.id === a.id) stopAudio();
+              loadAudio();
+            } catch (err) { setLibStatus(err.message, "err"); }
+          } },
+        ],
+      });
+      if (playing) row.classList.add("is-playing");
+      li.appendChild(row);
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+  });
+}
+
+async function playAudio(item) {
+  const el = $("#audio-el");
+  try {
+    const url = await DB.audioUrl(item.path);
+    state.audio.current = item;
+    $("#audio-now-title").textContent = (item.folder ? item.folder + " · " : "") + item.title;
+    $("#audio-player").classList.remove("hidden");
+    el.src = url;
+    el.playbackRate = Number($("#audio-rate").value) || 1;
+    renderAudio(state.audio.items);
+    await el.play().catch(() => {}); // autoplay może zablokować przeglądarka — zostaje przycisk ▶
+  } catch (err) { setLibStatus(err.message, "err"); }
+}
+
+function stopAudio() {
+  const el = $("#audio-el");
+  el.pause();
+  el.removeAttribute("src");
+  el.load();
+  state.audio.current = null;
+  $("#audio-player").classList.add("hidden");
+}
+
+function playNeighbour(step) {
+  const q = state.audio.queue;
+  const cur = state.audio.current;
+  const i = cur ? q.findIndex((a) => a.id === cur.id) : -1;
+  const next = q[i + step];
+  if (next) playAudio(next);
+}
+
+$("#audio-el").addEventListener("ended", () => playNeighbour(1));
+// Podpisany adres wygasa po godzinie — przy błędzie odtwarzania pobieramy nowy i wznawiamy.
+$("#audio-el").addEventListener("error", async () => {
+  const el = $("#audio-el");
+  const cur = state.audio.current;
+  if (!cur || el.dataset.retry === cur.id) return;
+  el.dataset.retry = cur.id;
+  const at = el.currentTime || 0;
+  try {
+    el.src = await DB.audioUrl(cur.path);
+    el.currentTime = at;
+    await el.play().catch(() => {});
+  } catch (_) {}
+});
+$("#audio-el").addEventListener("playing", () => { delete $("#audio-el").dataset.retry; });
+$("#audio-next").addEventListener("click", () => playNeighbour(1));
+$("#audio-prev").addEventListener("click", () => playNeighbour(-1));
+$("#audio-rate").addEventListener("change", (e) => { $("#audio-el").playbackRate = Number(e.target.value) || 1; });
+
 function libCard(o) {
   const { kind, icon, name, sub, onOpen, actions = [] } = o;
   const wrap = document.createElement("div");
@@ -707,6 +849,11 @@ $("#my-sort").addEventListener("change", (e) => {
 $("#pub-search").addEventListener("input", (e) => {
   state.pub.query = e.target.value.trim().toLowerCase();
   renderPublic(state.pub.items);
+});
+
+$("#audio-search").addEventListener("input", (e) => {
+  state.audio.query = e.target.value.trim().toLowerCase();
+  renderAudio(state.audio.items);
 });
 
 $("#btn-new-material").addEventListener("click", () => {

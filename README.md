@@ -19,6 +19,11 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
     (pokaż odpowiedź → Powtórz / Trudne / Dobre / Łatwe);
   - fiszki: **Nauka** (przerabiasz całość, karta wraca aż „Łatwe") i **Przegląd**
     (szybka powtórka — „Dobre" lub „Łatwe" kończy kartę).
+- **Audio** — zakładka z nagraniami MP3 wysłanymi z aplikacji mobilnej (AI Lab →
+  „Wyślij MP3 do J-Learner web”): lista pogrupowana w foldery, odtwarzacz z tempem
+  0.8–2×, automatycznie gra kolejny plik (np. następny rozdział), pobieranie i usuwanie.
+  Pliki leżą w prywatnym buckecie Supabase Storage `audio`, każdy widzi tylko swoje.
+  Wymaga uruchomienia aktualnego `supabase/schema.sql` (sekcja AUDIO).
 - Skróty klawiszowe: ABCD `1`–`4`, `Enter`, `S`; oceny fiszek `Spacja`, `1`–`4`.
 - **Wyszukiwarka i sortowanie** w bibliotece (filtr po tytule, Nazwa A–Z / Ostatnio zmienione).
 - **Reset hasła** — link „Nie pamiętasz hasła?" wysyła e-mail; po kliknięciu w link

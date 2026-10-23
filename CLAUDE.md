@@ -33,7 +33,7 @@ Edge Function `publish-material`).
 
 | Plik | Rola |
 |---|---|
-| `index.html` | Cały markup; ekrany jako `<section class="screen">`: `screen-auth`, `screen-library`, `screen-editor`, `screen-ready`, `screen-test`, `screen-flash`, `screen-results`. CSP w `<meta>`. |
+| `index.html` | Cały markup; ekrany jako `<section class="screen">`: `screen-auth`, `screen-library` (zakładki: Moje materiały / Od autora / Audio), `screen-editor`, `screen-ready`, `screen-test`, `screen-flash`, `screen-results`. CSP w `<meta>`. |
 | `assets/app.js` (~1700 linii) | Cała logika UI: logowanie/rejestracja/reset hasła, biblioteka (foldery, kategorie, wyszukiwarka, sortowanie), modale, edytor, ekran startu sesji, silniki trybów nauki, zapis postępu, wyniki. |
 | `assets/supabase.js` | Warstwa danych, eksportuje `JLDB`: sesja (localStorage + odświeżanie tokenu), `rest()`, foldery, materiały, postęp. |
 | `assets/parsers.js` | Eksportuje `JLParsers`: `parseTestText`, `parseFlashcardText`, `detectMaterialType` itd. |
@@ -41,7 +41,7 @@ Edge Function `publish-material`).
 | `assets/styles.css` | Cały wygląd (~1600 linii). |
 | `sw.js` | Service worker: cache shellu (cache-first dla zasobów z `?v=`). |
 | `manifest.webmanifest`, `assets/icons/` | PWA. |
-| `supabase/schema.sql` | Tabele `folders`, `materials`, `progress` + polityki RLS + trigger `touch_updated_at`. Idempotentny — wkleja się go do SQL Editor. |
+| `supabase/schema.sql` | Tabele `folders`, `materials`, `progress`, `audio_files`, bucket `audio` + polityki RLS + trigger `touch_updated_at`. Idempotentny — wkleja się go do SQL Editor. |
 | `supabase/functions/publish-material/index.ts` | Edge Function (Deno): publikuje materiał do „Od autora" (sekrety: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `AUTHOR_USER_ID`). |
 | `supabase/publish.mjs` | Skrypt Node do publikowania materiałów kluczem `service_role`. |
 | `samples/` | Przykładowe pliki w obu formatach. |
@@ -55,6 +55,10 @@ Edge Function `publish-material`).
   `content` (surowy tekst w formacie poniżej), `tags`, `is_public`, `updated_at` (trigger). Publiczne czyta każdy;
   zwykły użytkownik nie może ustawić `is_public = true` (blokuje to RLS) — publikacja
   tylko przez `service_role` / Edge Function.
+- `audio_files` — MP3 z aplikacji mobilnej: `title`, `folder`, `path` (klucz w prywatnym
+  buckecie Storage `audio`, zawsze `<user_id>/…`), `size_bytes`; upsert po `(user_id, path)`.
+  Odtwarzanie przez podpisany URL (`/storage/v1/object/sign/…`, 1 h); CSP ma `media-src`
+  dla Supabase.
 - `progress` — postęp: `material_id`, `card_key`, `mode`
   (`classic` | `exam` | `flash` | `nauka` | `przeglad`), `passed`, `difficulty`
   (`none`/`easy`/`hard`), `times_shown`; upsert po `(user_id, material_id, card_key, mode)`.
@@ -89,7 +93,7 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **11**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **12**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
 2. `assets/app.js` — `?v=N` w importach `parsers.js` i `supabase.js` oraz `APP_VERSION`,
