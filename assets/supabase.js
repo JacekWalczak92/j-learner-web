@@ -3,7 +3,7 @@
 //  Eksportuje JLDB. Tokeny trzymane w localStorage (logowanie trwałe).
 // ============================================================================
 
-import { JL_CONFIG } from "./config.js?v=11";
+import { JL_CONFIG } from "./config.js?v=12";
 
 const CFG = JL_CONFIG || {};
 const SB_URL = (CFG.supabaseUrl || "").replace(/\/+$/, "");
@@ -279,6 +279,57 @@ function resetProgress(materialId, mode) {
   return rest(q, { method: "DELETE" });
 }
 
+// ── Audio (MP3 z aplikacji mobilnej: Storage `audio` + tabela audio_files) ──
+const AUDIO_BUCKET = "audio";
+
+function storagePath(path) {
+  return String(path).split("/").map(encodeURIComponent).join("/");
+}
+/** Zapytanie do Storage z odświeżeniem tokenu przy 401 (jak rest()). */
+async function storage(path, { method = "GET", body } = {}) {
+  const doFetch = async () => {
+    const headers = { apikey: SB_KEY, "Content-Type": "application/json" };
+    if (session && session.access_token) headers.Authorization = "Bearer " + session.access_token;
+    try {
+      return await fetch(SB_URL + "/storage/v1" + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    } catch (e) {
+      throw asNetworkError(e);
+    }
+  };
+  let resp = await doFetch();
+  if ((resp.status === 401 || resp.status === 400) && session && session.refresh_token) {
+    // Storage zgłasza wygasły JWT jako 400 albo 401.
+    const data = await resp.clone().json().catch(() => ({}));
+    if (resp.status === 401 || /jwt|exp/i.test(String(data.message || data.error || ""))) {
+      if (await tryRefresh()) resp = await doFetch();
+    }
+  }
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.message || data.error || "Błąd plików (" + resp.status + ").");
+  }
+  return resp.json().catch(() => null);
+}
+function listAudio() {
+  return rest("/audio_files?select=id,title,folder,path,size_bytes,created_at,updated_at&order=folder.asc,title.asc");
+}
+/** Podpisany adres MP3 (ważny godzinę) — do odtwarzania i pobrania. */
+async function audioUrl(path, download) {
+  const data = await storage("/object/sign/" + AUDIO_BUCKET + "/" + storagePath(path), {
+    method: "POST",
+    body: { expiresIn: 3600 },
+  });
+  const signed = data && (data.signedURL || data.signedUrl);
+  if (!signed) throw new Error("Nie udało się otworzyć nagrania.");
+  let url = SB_URL + "/storage/v1" + signed;
+  if (download) url += (url.includes("?") ? "&" : "?") + "download=" + encodeURIComponent(download);
+  return url;
+}
+async function deleteAudio(item) {
+  await storage("/object/" + AUDIO_BUCKET, { method: "DELETE", body: { prefixes: [item.path] } });
+  return rest("/audio_files?id=eq." + encodeURIComponent(item.id), { method: "DELETE" });
+}
+
 export const JLDB = {
   isConfigured,
   setSessionExpiredHandler,
@@ -302,4 +353,7 @@ export const JLDB = {
   listProgress,
   upsertProgress,
   resetProgress,
+  listAudio,
+  audioUrl,
+  deleteAudio,
 };
