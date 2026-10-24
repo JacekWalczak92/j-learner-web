@@ -8,10 +8,10 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=12";
-import { JLDB as DB } from "./supabase.js?v=12";
+import { JLParsers as JLP } from "./parsers.js?v=13";
+import { JLDB as DB } from "./supabase.js?v=13";
 
-const APP_VERSION = "12";
+const APP_VERSION = "13";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
