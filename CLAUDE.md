@@ -57,6 +57,8 @@ Edge Function `publish-material`).
   tylko przez `service_role` / Edge Function.
 - `audio_files` — MP3 z aplikacji mobilnej: `title`, `folder`, `path` (klucz w prywatnym
   buckecie Storage `audio`, zawsze `<user_id>/…`), `size_bytes`; upsert po `(user_id, path)`.
+  Nagrania kont z `app_authors` (sprawdzane funkcją `is_author()`, security definer) widzą
+  wszyscy zalogowani — w UI sekcje „Od autora · folder”, bez usuwania.
   Odtwarzanie przez podpisany URL (`/storage/v1/object/sign/…`, 1 h); CSP ma `media-src`
   dla Supabase.
 - `progress` — postęp: `material_id`, `card_key`, `mode`
@@ -93,7 +95,7 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **13**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **14**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
 2. `assets/app.js` — `?v=N` w importach `parsers.js` i `supabase.js` oraz `APP_VERSION`,
