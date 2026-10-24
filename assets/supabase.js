@@ -3,7 +3,7 @@
 //  Eksportuje JLDB. Tokeny trzymane w localStorage (logowanie trwałe).
 // ============================================================================
 
-import { JL_CONFIG } from "./config.js?v=12";
+import { JL_CONFIG } from "./config.js?v=13";
 
 const CFG = JL_CONFIG || {};
 const SB_URL = (CFG.supabaseUrl || "").replace(/\/+$/, "");
@@ -124,7 +124,7 @@ async function signIn(email, password) {
 }
 
 async function signUp(email, password) {
-  const data = await authRequest("/signup", { email, password });
+  const data = await authRequest("/signup?redirect_to=" + encodeURIComponent(appRedirectUrl()), { email, password });
   if (data.access_token) {
     saveSession({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user });
     return { user: getUser(), needsConfirm: false };
@@ -148,9 +148,15 @@ async function tryRefresh() {
   }
 }
 
-/** Wysyła e-mail z linkiem do zresetowania hasła (Supabase: Auth → URL Configuration → Site URL). */
+/** Adres powrotu z linków w e-mailach = bieżąca strona (bez hasha i query).
+ *  Musi być na liście Auth → URL Configuration → Redirect URLs, inaczej Supabase użyje Site URL. */
+function appRedirectUrl() {
+  return location.origin + location.pathname.replace(/index\.html$/, "");
+}
+
+/** Wysyła e-mail z linkiem do zresetowania hasła. */
 function requestPasswordReset(email) {
-  return authRequest("/recover", { email });
+  return authRequest("/recover?redirect_to=" + encodeURIComponent(appRedirectUrl()), { email });
 }
 
 /** Ustawia nowe hasło tokenem z linku „recovery" (hash w URL: #access_token=…&type=recovery). */

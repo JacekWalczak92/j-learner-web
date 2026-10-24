@@ -58,8 +58,9 @@ Pełna instrukcja: **`supabase/README.md`**. W skrócie:
 2. **SQL Editor** → wklej `supabase/schema.sql` → **Run** (tworzy tabele + reguły RLS).
 3. **Project Settings → API** → skopiuj *Project URL* i *anon key* do `assets/config.js`.
 4. (Na start) wyłącz potwierdzanie e-maila w **Authentication → Providers → Email**.
-5. Dla resetu hasła: **Authentication → URL Configuration → Site URL** ustaw na adres
-   strony (np. `https://twojlogin.github.io/j-learner-web/`) — tam trafia link z e-maila.
+5. Dla resetu hasła: w **Authentication → URL Configuration** ustaw **Site URL** na adres
+   strony (np. `https://twojlogin.github.io/j-learner-web/`) i dodaj ten sam adres do
+   **Redirect URLs** — aplikacja podaje go jako `redirect_to`, więc tam trafia link z e-maila.
 
 `anon key` jest publiczny z założenia — bezpieczeństwa pilnują reguły **RLS** w bazie
 (każdy widzi tylko swoje dane; materiały publiczne czyta każdy; zwykły użytkownik nie
