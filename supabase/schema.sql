@@ -113,7 +113,8 @@ create policy "progress_delete_own" on public.progress for delete using (auth.ui
 -- ════════════════════════════════════════════════════════════════════════════
 --  AUDIO  (MP3 z aplikacji mobilnej → zakładka „Audio")
 --  Pliki: Storage, prywatny bucket `audio`, ścieżka <user_id>/<folder>/<plik>.mp3.
---  Opis (tytuł, folder, rozmiar): tabela audio_files. Każdy widzi tylko swoje.
+--  Opis (tytuł, folder, rozmiar): tabela audio_files. Każdy widzi swoje, a nagrania
+--  kont z tabeli app_authors („Od autora") widzą wszyscy zalogowani (tylko odczyt).
 -- ════════════════════════════════════════════════════════════════════════════
 create table if not exists public.audio_files (
   id         uuid primary key default gen_random_uuid(),
@@ -133,6 +134,23 @@ drop trigger if exists trg_audio_files_touch on public.audio_files;
 create trigger trg_audio_files_touch before update on public.audio_files
   for each row execute function public.touch_updated_at();
 
+-- Konta autora: ich nagrania widzą wszyscy zalogowani. Bez polityk = przez REST nikt
+-- tej tabeli nie czyta ani nie zmienia; wpis dodajesz tutaj w SQL Editor:
+--   insert into public.app_authors (user_id)
+--     select id from auth.users where email = 'TWOJ_EMAIL' on conflict do nothing;
+create table if not exists public.app_authors (
+  user_id uuid primary key references auth.users(id) on delete cascade
+);
+alter table public.app_authors enable row level security;
+
+-- security definer: polityki muszą sprawdzić app_authors mimo braku dostępu do niej.
+create or replace function public.is_author(uid uuid) returns boolean
+  language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.app_authors where user_id = uid);
+$$;
+revoke all on function public.is_author(uuid) from public;
+grant execute on function public.is_author(uuid) to authenticated;
+
 alter table public.audio_files enable row level security;
 grant select, insert, update, delete on public.audio_files to authenticated;
 
@@ -140,7 +158,9 @@ drop policy if exists "audio_files_select_own" on public.audio_files;
 drop policy if exists "audio_files_insert_own" on public.audio_files;
 drop policy if exists "audio_files_update_own" on public.audio_files;
 drop policy if exists "audio_files_delete_own" on public.audio_files;
-create policy "audio_files_select_own" on public.audio_files for select using (auth.uid() = user_id);
+drop policy if exists "audio_files_select_own_or_author" on public.audio_files;
+create policy "audio_files_select_own_or_author" on public.audio_files
+  for select to authenticated using (auth.uid() = user_id or public.is_author(user_id));
 create policy "audio_files_insert_own" on public.audio_files for insert with check (auth.uid() = user_id);
 create policy "audio_files_update_own" on public.audio_files for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "audio_files_delete_own" on public.audio_files for delete using (auth.uid() = user_id);
@@ -151,13 +171,17 @@ values ('audio', 'audio', false, 52428800, array['audio/mpeg'])
 on conflict (id) do update
   set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
--- Storage: użytkownik zapisuje i czyta tylko pod własnym <user_id>/…
+-- Storage: użytkownik zapisuje tylko pod własnym <user_id>/…, czyta swoje i autora.
 drop policy if exists "audio_objects_select_own" on storage.objects;
 drop policy if exists "audio_objects_insert_own" on storage.objects;
 drop policy if exists "audio_objects_update_own" on storage.objects;
 drop policy if exists "audio_objects_delete_own" on storage.objects;
-create policy "audio_objects_select_own" on storage.objects for select to authenticated
-  using (bucket_id = 'audio' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "audio_objects_select_own_or_author" on storage.objects;
+create policy "audio_objects_select_own_or_author" on storage.objects for select to authenticated
+  using (bucket_id = 'audio' and (
+    (storage.foldername(name))[1] = auth.uid()::text
+    or exists (select 1 from public.audio_files f
+               where f.path = storage.objects.name and public.is_author(f.user_id))));
 create policy "audio_objects_insert_own" on storage.objects for insert to authenticated
   with check (bucket_id = 'audio' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "audio_objects_update_own" on storage.objects for update to authenticated

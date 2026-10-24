@@ -8,10 +8,10 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=13";
-import { JLDB as DB } from "./supabase.js?v=13";
+import { JLParsers as JLP } from "./parsers.js?v=14";
+import { JLDB as DB } from "./supabase.js?v=14";
 
-const APP_VERSION = "13";
+const APP_VERSION = "14";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -512,22 +512,27 @@ function renderAudio(allItems) {
     : "Brak nagrań. W aplikacji mobilnej (AI Lab) utwórz MP3 i wybierz „Wyślij MP3 do J-Learner web”.";
   empty.classList.toggle("hidden", items.length > 0);
 
-  // Kolejność odtwarzania = kolejność na liście (folder, potem tytuł; rozdziały numerycznie).
+  // Kolejność odtwarzania = kolejność na liście (własne, potem „Od autora"; folder, potem tytuł;
+  // rozdziały numerycznie). Cudze nagrania to zawsze nagrania autora (tylko odczyt).
+  const uid = DB.getUserId();
   const groups = new Map();
   items.forEach((a) => {
-    const key = a.folder || "";
+    const key = (a.user_id && a.user_id !== uid ? "1" : "0") + (a.folder || "");
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(a);
   });
   const coll = new Intl.Collator("pl", { numeric: true });
-  const keys = Array.from(groups.keys()).sort((a, b) => (!a) - (!b) || coll.compare(a, b)); // „Bez folderu" na końcu
+  const keys = Array.from(groups.keys()).sort((a, b) =>
+    a[0].localeCompare(b[0]) || (a.length === 1) - (b.length === 1) || coll.compare(a, b)); // „Bez folderu" na końcu
   state.audio.queue = [];
   keys.forEach((key) => {
+    const shared = key[0] === "1";
+    const folder = key.slice(1);
     const list = groups.get(key).sort((a, b) => coll.compare(a.title, b.title));
     state.audio.queue.push(...list);
     const h = document.createElement("h3");
     h.className = "audio-folder";
-    h.textContent = key || "Bez folderu";
+    h.textContent = (shared ? "Od autora · " : "") + (folder || "Bez folderu");
     box.appendChild(h);
     const ul = document.createElement("ul");
     ul.className = "lib-list";
@@ -547,7 +552,7 @@ function renderAudio(allItems) {
               document.body.appendChild(link); link.click(); link.remove();
             } catch (err) { setLibStatus(err.message, "err"); }
           } },
-          { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
+          !shared && { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
             const ok = await modalConfirm("Usunąć nagranie?", `Nagranie „${a.title}" zostanie usunięte z J-Learner web.`, { danger: true, okLabel: "Usuń" });
             if (!ok) return;
             try {
@@ -617,7 +622,8 @@ $("#audio-prev").addEventListener("click", () => playNeighbour(-1));
 $("#audio-rate").addEventListener("change", (e) => { $("#audio-el").playbackRate = Number(e.target.value) || 1; });
 
 function libCard(o) {
-  const { kind, icon, name, sub, onOpen, actions = [] } = o;
+  const { kind, icon, name, sub, onOpen } = o;
+  const actions = (o.actions || []).filter(Boolean);
   const wrap = document.createElement("div");
   wrap.className = "lib-rowwrap";
 

@@ -3,7 +3,7 @@
 //  Eksportuje JLDB. Tokeny trzymane w localStorage (logowanie trwałe).
 // ============================================================================
 
-import { JL_CONFIG } from "./config.js?v=13";
+import { JL_CONFIG } from "./config.js?v=14";
 
 const CFG = JL_CONFIG || {};
 const SB_URL = (CFG.supabaseUrl || "").replace(/\/+$/, "");
@@ -317,7 +317,7 @@ async function storage(path, { method = "GET", body } = {}) {
   return resp.json().catch(() => null);
 }
 function listAudio() {
-  return rest("/audio_files?select=id,title,folder,path,size_bytes,created_at,updated_at&order=folder.asc,title.asc");
+  return rest("/audio_files?select=id,user_id,title,folder,path,size_bytes,created_at,updated_at&order=folder.asc,title.asc");
 }
 /** Podpisany adres MP3 (ważny godzinę) — do odtwarzania i pobrania. */
 async function audioUrl(path, download) {
@@ -342,6 +342,7 @@ export const JLDB = {
   requestPasswordReset,
   updatePasswordWithToken,
   getUser,
+  getUserId,
   signIn,
   signUp,
   signOut,
