@@ -8,11 +8,11 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=16";
-import { JLDB as DB } from "./supabase.js?v=16";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers } from "./neuro.js?v=16";
+import { JLParsers as JLP } from "./parsers.js?v=17";
+import { JLDB as DB } from "./supabase.js?v=17";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks } from "./neuro.js?v=17";
 
-const APP_VERSION = "16";
+const APP_VERSION = "17";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -275,7 +275,7 @@ function switchTab(tab) {
   setLibStatus("");
   if (tab === "mine") loadMy();
   else if (tab === "audio") loadAudio();
-  else if (tab === "neuro") renderNeuroList();
+  else if (tab === "neuro") showNeuroView(neuroView);
   else loadPublic();
 }
 $$('.source-tab[data-tab]').forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
@@ -715,6 +715,42 @@ function neuroMistakeItems() {
     const item = board && board.items.find((it) => it.n === Number(key.slice(i + 1)));
     return item ? { board, item } : null;
   }).filter(Boolean);
+}
+
+// ── Neuro EN: widok Plansze / Fiszki ─────────────────────────────────────────
+let neuroView = "boards";
+function showNeuroView(view) {
+  neuroView = view;
+  $$(".neuro-view").forEach((b) => b.classList.toggle("is-active", b.dataset.view === view));
+  $("#neuro-boards").classList.toggle("hidden", view !== "boards");
+  $("#neuro-cards").classList.toggle("hidden", view !== "cards");
+  if (view === "cards") renderNeuroDecks();
+  else renderNeuroList();
+}
+$$(".neuro-view").forEach((b) => b.addEventListener("click", () => showNeuroView(b.dataset.view)));
+
+function renderNeuroDecks() {
+  const ul = $("#neuro-decks");
+  ul.innerHTML = "";
+  neuroVocabDecks().forEach((d) => {
+    const li = document.createElement("li");
+    li.appendChild(libCard({
+      kind: "file", icon: "❏", name: d.title,
+      sub: `${d.sub} · ${d.cards.length} ${plural(d.cards.length, "fiszka", "fiszki", "fiszek")}`,
+      onOpen: () => openNeuroDeck(d),
+    }));
+    ul.appendChild(li);
+  });
+}
+
+/** Talia jako materiał w pamięci (bez id → postęp nie trafia do bazy); dalej zwykłe tryby fiszek. */
+function openNeuroDeck(deck) {
+  state.material = {
+    id: null, type: "flashcards", name: "Neuro EN · " + deck.title,
+    items: deck.cards.map((c) => ({ front: c.en, back: c.pl, explanation: c.note })),
+  };
+  renderReady();
+  showScreen("screen-ready");
 }
 
 function plStruct(n) {

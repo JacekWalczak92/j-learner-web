@@ -41,6 +41,10 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   - **Powtórka błędów** — karta na górze listy plansz: zbiera struktury pomylone w dowolnym
     trybie na wszystkich planszach i pyta o nie w losowej kolejności (rysunek z podświetlonym
     numerem, wpisujesz nazwę EN); dobra odpowiedź usuwa strukturę z powtórki.
+  - **Fiszki** (przełącznik „Plansze / Fiszki” na górze zakładki) — talie słówek EN → PL:
+    wszystkie słówka (bez powtórek), osobno każda plansza i „Pojęcia ogólne” (neurony,
+    potencjały, neuroprzekaźniki, istota szara/biała…). Działają na zwykłym silniku fiszek
+    (Nauka / Przegląd, „Odwróć strony” = PL → EN); postęp nie jest zapisywany w bazie.
   Wszędzie: „Popraw błędne”, wymowa 🔊 (synteza mowy przeglądarki), opcjonalna podpowiedź
   po polsku. Nowe plansze dodaje się w `assets/neuro.js`; najlepsze wyniki zapisują się
   lokalnie w przeglądarce.
