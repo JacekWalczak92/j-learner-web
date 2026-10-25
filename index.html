@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="assets/styles.css?v=14" />
+  <link rel="stylesheet" href="assets/styles.css?v=15" />
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
@@ -65,9 +65,10 @@
     <!-- ───────────────────────── BIBLIOTEKA ───────────────────────── -->
     <section id="screen-library" class="screen">
       <div class="sources" role="tablist" aria-label="Widok">
-        <button class="source-tab is-active" role="tab" data-tab="mine">Moje materiały</button>
+        <button class="source-tab is-active" role="tab" data-tab="mine"><span class="tab-long">Moje materiały</span><span class="tab-short">Moje</span></button>
         <button class="source-tab" role="tab" data-tab="public">Od autora</button>
         <button class="source-tab" role="tab" data-tab="audio">Audio</button>
+        <button class="source-tab" role="tab" data-tab="neuro">Neuro EN</button>
       </div>
 
       <div id="tab-mine">
@@ -126,7 +127,41 @@
         <p id="audio-empty" class="lib-empty hidden">Brak nagrań. W aplikacji mobilnej (AI Lab) utwórz MP3 i wybierz „Wyślij MP3 do J-Learner web”.</p>
       </div>
 
+      <div id="tab-neuro" class="hidden">
+        <p class="nb-intro">Angielskie nazwy struktur mózgu i neuronu. Na planszy wpisz nazwę dla każdego numeru —
+          aplikacja sprawdzi odpowiedź (wielkość liter i spacje nie mają znaczenia) i pokaże poprawną.</p>
+        <ul id="neuro-list" class="lib-list"></ul>
+      </div>
+
       <p id="lib-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ───────────────────────── NEURO EN: PLANSZA ───────────────────────── -->
+    <section id="screen-neuro" class="screen">
+      <div class="session-bar">
+        <div class="progress-track"><div id="nb-progress" class="progress-fill"></div></div>
+        <div class="session-stats">
+          <span id="nb-count" class="stat">0 / 0</span>
+          <span id="nb-score" class="stat stat-ok">✓ 0</span>
+        </div>
+      </div>
+      <div class="nb-head">
+        <h1 id="nb-title" class="nb-title"></h1>
+        <label class="nb-toggle"><input id="nb-hints" type="checkbox" /> Podpowiedź po polsku</label>
+      </div>
+      <div class="nb-layout">
+        <div id="nb-figure" class="nb-figure"></div>
+        <ol id="nb-inputs" class="nb-inputs"></ol>
+      </div>
+      <p id="nb-summary" class="nb-summary hidden" role="status" aria-live="polite"></p>
+      <div class="session-controls">
+        <button id="btn-nb-check" class="btn btn-primary" type="button">Sprawdź wszystko</button>
+        <button id="btn-nb-retry" class="btn btn-secondary" type="button">Popraw błędne</button>
+        <button id="btn-nb-reveal" class="btn btn-ghost" type="button">Pokaż odpowiedzi</button>
+        <button id="btn-nb-reset" class="btn btn-ghost" type="button">Od nowa</button>
+      </div>
+      <p class="kbd-hint"><span class="kbd">Enter</span> sprawdź i dalej &middot; kliknij numer na rysunku, aby przejść do pola</p>
+      <div class="session-controls"><button id="btn-nb-quit" class="btn btn-link" type="button">Wróć do listy plansz</button></div>
     </section>
 
     <!-- ───────────────────────── EDYTOR ───────────────────────── -->
@@ -296,6 +331,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=14"></script>
+  <script type="module" src="assets/app.js?v=15"></script>
 </body>
 </html>

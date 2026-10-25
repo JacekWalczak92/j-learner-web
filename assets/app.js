@@ -8,10 +8,11 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=14";
-import { JLDB as DB } from "./supabase.js?v=14";
+import { JLParsers as JLP } from "./parsers.js?v=15";
+import { JLDB as DB } from "./supabase.js?v=15";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer } from "./neuro.js?v=15";
 
-const APP_VERSION = "14";
+const APP_VERSION = "15";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -28,6 +29,7 @@ const state = {
   },
   pub: { items: [], query: "" },
   audio: { items: [], query: "", current: null, queue: [] },
+  neuro: { board: null, answers: {}, results: {}, revealed: false },
   editing: null,
 };
 
@@ -269,9 +271,11 @@ function switchTab(tab) {
   $("#tab-mine").classList.toggle("hidden", tab !== "mine");
   $("#tab-public").classList.toggle("hidden", tab !== "public");
   $("#tab-audio").classList.toggle("hidden", tab !== "audio");
+  $("#tab-neuro").classList.toggle("hidden", tab !== "neuro");
   setLibStatus("");
   if (tab === "mine") loadMy();
   else if (tab === "audio") loadAudio();
+  else if (tab === "neuro") renderNeuroList();
   else loadPublic();
 }
 $$('.source-tab[data-tab]').forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
@@ -674,6 +678,185 @@ function libCard(o) {
   if (panel) wrap.appendChild(panel);
   return wrap;
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+//  NEURO EN — plansze z angielskimi nazwami struktur (wpisywanie + weryfikacja)
+// ════════════════════════════════════════════════════════════════════════════
+// Najlepsze wyniki tylko lokalnie (bez zmian w bazie): { [boardId]: { ok, total } }.
+const NEURO_BEST_KEY = "jl_neuro_best";
+function neuroBest() {
+  try { return JSON.parse(localStorage.getItem(NEURO_BEST_KEY) || "{}") || {}; } catch (_) { return {}; }
+}
+function saveNeuroBest(id, ok, total) {
+  const all = neuroBest();
+  if (all[id] && all[id].ok >= ok) return;
+  all[id] = { ok, total };
+  try { localStorage.setItem(NEURO_BEST_KEY, JSON.stringify(all)); } catch (_) { /* tryb prywatny */ }
+}
+
+function renderNeuroList() {
+  const ul = $("#neuro-list");
+  ul.innerHTML = "";
+  const best = neuroBest();
+  NEURO_BOARDS.forEach((b) => {
+    const rec = best[b.id];
+    const li = document.createElement("li");
+    li.appendChild(libCard({
+      kind: "file", icon: "✎", name: b.titlePl,
+      sub: `${b.title} · ${b.items.length} nazw` + (rec ? ` · najlepszy wynik ${rec.ok}/${rec.total}` : ""),
+      onOpen: () => openNeuroBoard(b.id),
+    }));
+    ul.appendChild(li);
+  });
+}
+
+function openNeuroBoard(id) {
+  const board = boardById(id);
+  if (!board) return;
+  state.neuro = { board, answers: {}, results: {}, revealed: false };
+  $("#nb-title").textContent = board.titlePl;
+  $("#nb-figure").innerHTML = boardSvgMarkup(board);
+  $$("#nb-figure .nb-mark").forEach((g) => g.addEventListener("click", () => focusNeuroInput(Number(g.dataset.n))));
+
+  const ol = $("#nb-inputs");
+  ol.innerHTML = "";
+  board.items.forEach((it) => {
+    const li = document.createElement("li");
+    li.className = "nb-row";
+    li.dataset.n = it.n;
+    li.innerHTML =
+      `<span class="nb-n">${it.n}</span>` +
+      `<div class="nb-field">` +
+        `<input class="text-input nb-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" lang="en" aria-label="Nazwa nr ${it.n}" />` +
+        `<span class="nb-hint">${escapeHtml(it.pl)}</span>` +
+        `<span class="nb-fb" aria-live="polite"></span>` +
+      `</div>`;
+    const input = li.querySelector("input");
+    input.addEventListener("focus", () => highlightNeuroMark(it.n));
+    input.addEventListener("input", () => { state.neuro.answers[it.n] = input.value; });
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      gradeNeuroItem(it);
+      updateNeuroStats();
+      focusNextNeuro(it.n);
+    });
+    ol.appendChild(li);
+  });
+  $("#nb-hints").checked = false;
+  $("#nb-inputs").classList.remove("show-hints");
+  updateNeuroStats();
+  showScreen("screen-neuro");
+}
+
+function neuroRow(n) { return $(`#nb-inputs .nb-row[data-n="${n}"]`); }
+
+function highlightNeuroMark(n) {
+  $$("#nb-figure .nb-mark").forEach((g) => g.classList.toggle("is-focus", Number(g.dataset.n) === n));
+  $$("#nb-inputs .nb-row").forEach((r) => r.classList.toggle("is-focus", Number(r.dataset.n) === n));
+}
+
+function focusNeuroInput(n) {
+  const row = neuroRow(n);
+  if (!row) return;
+  const input = row.querySelector("input");
+  input.focus({ preventScroll: true });
+  row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+/** Następne pole bez poprawnej odpowiedzi (cyklicznie); gdy brak — zdejmij fokus. */
+function focusNextNeuro(fromN) {
+  const items = state.neuro.board.items;
+  const start = items.findIndex((it) => it.n === fromN);
+  for (let k = 1; k <= items.length; k++) {
+    const it = items[(start + k) % items.length];
+    if (state.neuro.results[it.n] !== "ok") return focusNeuroInput(it.n);
+  }
+  document.activeElement && document.activeElement.blur();
+  highlightNeuroMark(0);
+}
+
+function setNeuroResult(it, res) {
+  state.neuro.results[it.n] = res;
+  const row = neuroRow(it.n);
+  const mark = $(`#nb-figure .nb-mark[data-n="${it.n}"]`);
+  ["ok", "typo", "bad"].forEach((c) => {
+    row.classList.toggle("is-" + c, res === c);
+    if (mark) mark.classList.toggle("is-" + c, res === c);
+  });
+  const fb = row.querySelector(".nb-fb");
+  const correct = it.en[0];
+  const alts = it.en.length > 1 ? " (też: " + it.en.slice(1).join(", ") + ")" : "";
+  const typed = normalizeAnswer(state.neuro.answers[it.n] || "");
+  const others = it.en.filter((e) => normalizeAnswer(e) !== typed);
+  if (res === "ok") fb.textContent = others.length ? "✓ Dobrze · inne nazwy: " + others.join(", ") : "✓ Dobrze";
+  else if (res === "typo") fb.textContent = "≈ Prawie — pisownia: " + correct;
+  else if (res === "bad") fb.textContent = "✕ Poprawnie: " + correct + alts;
+  else fb.textContent = "";
+}
+
+function gradeNeuroItem(it) {
+  const res = gradeAnswer(state.neuro.answers[it.n] || "", it);
+  setNeuroResult(it, res === "empty" ? "bad" : res);
+}
+
+function updateNeuroStats() {
+  const { board, results } = state.neuro;
+  const total = board.items.length;
+  const done = board.items.filter((it) => results[it.n]).length;
+  const ok = board.items.filter((it) => results[it.n] === "ok").length;
+  const typo = board.items.filter((it) => results[it.n] === "typo").length;
+  $("#nb-count").textContent = `${done} / ${total}`;
+  $("#nb-score").textContent = `✓ ${ok}`;
+  $("#nb-progress").style.width = Math.round((done / total) * 100) + "%";
+  const sum = $("#nb-summary");
+  if (done < total) { sum.classList.add("hidden"); return; }
+  sum.classList.remove("hidden");
+  if (state.neuro.revealed) {
+    sum.textContent = "Odpowiedzi pokazane — kliknij „Od nowa”, żeby spróbować samodzielnie.";
+    return;
+  }
+  sum.textContent = ok === total
+    ? `Komplet! ${ok}/${total} poprawnie.`
+    : `Wynik: ${ok}/${total} poprawnie` + (typo ? ` (+${typo} z literówką)` : "") + ". „Popraw błędne” wyczyści tylko złe odpowiedzi.";
+  saveNeuroBest(board.id, ok, total);
+}
+
+$("#btn-nb-check").addEventListener("click", () => {
+  state.neuro.board.items.forEach(gradeNeuroItem);
+  updateNeuroStats();
+});
+$("#btn-nb-reveal").addEventListener("click", () => {
+  state.neuro.revealed = true;
+  state.neuro.board.items.forEach((it) => {
+    if (state.neuro.results[it.n] === "ok") return;
+    const row = neuroRow(it.n);
+    row.querySelector("input").value = it.en[0];
+    state.neuro.answers[it.n] = it.en[0];
+    setNeuroResult(it, "bad");
+    row.querySelector(".nb-fb").textContent = "Odpowiedź: " + it.en[0];
+  });
+  updateNeuroStats();
+});
+// Czyści złe (lub wszystkie) odpowiedzi i ustawia fokus na pierwszym pustym polu.
+function clearNeuro(onlyWrong) {
+  if (!onlyWrong) state.neuro.revealed = false;
+  let first = null;
+  state.neuro.board.items.forEach((it) => {
+    if (onlyWrong && state.neuro.results[it.n] === "ok") return;
+    neuroRow(it.n).querySelector("input").value = "";
+    state.neuro.answers[it.n] = "";
+    delete state.neuro.results[it.n];
+    setNeuroResult(it, null);
+    if (first === null) first = it.n;
+  });
+  updateNeuroStats();
+  if (first !== null) focusNeuroInput(first);
+}
+$("#btn-nb-retry").addEventListener("click", () => clearNeuro(true));
+$("#btn-nb-reset").addEventListener("click", () => clearNeuro(false));
+$("#nb-hints").addEventListener("change", (e) => $("#nb-inputs").classList.toggle("show-hints", e.target.checked));
+$("#btn-nb-quit").addEventListener("click", () => { showScreen("screen-library"); renderNeuroList(); });
 
 // ── Modal (ogólny) + przenoszenie materiałów do/z folderów ───────────────────
 let _modalDismiss = null; // wywoływane przy każdym zamknięciu (Escape/overlay/Zamknij)

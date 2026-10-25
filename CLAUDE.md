@@ -33,10 +33,11 @@ Edge Function `publish-material`).
 
 | Plik | Rola |
 |---|---|
-| `index.html` | Cały markup; ekrany jako `<section class="screen">`: `screen-auth`, `screen-library` (zakładki: Moje materiały / Od autora / Audio), `screen-editor`, `screen-ready`, `screen-test`, `screen-flash`, `screen-results`. CSP w `<meta>`. |
+| `index.html` | Cały markup; ekrany jako `<section class="screen">`: `screen-auth`, `screen-library` (zakładki: Moje materiały / Od autora / Audio / Neuro EN), `screen-editor`, `screen-ready`, `screen-test`, `screen-flash`, `screen-results`, `screen-neuro`. CSP w `<meta>`. |
 | `assets/app.js` (~1700 linii) | Cała logika UI: logowanie/rejestracja/reset hasła, biblioteka (foldery, kategorie, wyszukiwarka, sortowanie), modale, edytor, ekran startu sesji, silniki trybów nauki, zapis postępu, wyniki. |
 | `assets/supabase.js` | Warstwa danych, eksportuje `JLDB`: sesja (localStorage + odświeżanie tokenu), `rest()`, foldery, materiały, postęp. |
 | `assets/parsers.js` | Eksportuje `JLParsers`: `parseTestText`, `parseFlashcardText`, `detectMaterialType` itd. |
+| `assets/neuro.js` | Eksportuje `NEURO_BOARDS` (plansze „Neuro EN": własne SVG, elementy `{ n, en[], pl, x, y, lx, ly }`), `boardSvgMarkup`, `gradeAnswer`. UI planszy w `app.js` (sekcja NEURO EN); najlepsze wyniki w localStorage `jl_neuro_best`. |
 | `assets/config.js` | `JL_CONFIG` = `{ supabaseUrl, supabaseAnonKey }`. |
 | `assets/styles.css` | Cały wygląd (~1600 linii). |
 | `sw.js` | Service worker: cache shellu (cache-first dla zasobów z `?v=`). |
@@ -95,10 +96,10 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **14**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **15**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
-2. `assets/app.js` — `?v=N` w importach `parsers.js` i `supabase.js` oraz `APP_VERSION`,
+2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js` i `neuro.js` oraz `APP_VERSION`,
 3. `assets/supabase.js` — `?v=N` w imporcie `config.js`,
 4. `sw.js` — stała `VERSION`.
 

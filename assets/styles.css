@@ -259,7 +259,8 @@ button:disabled { -webkit-text-fill-color: currentColor; }
 #screen-ready,
 #screen-test,
 #screen-flash,
-#screen-results { margin-inline: auto; }
+#screen-results,
+#screen-neuro { margin-inline: auto; }
 
 #screen-library { max-width: 1040px; }
 #screen-editor { max-width: 900px; }
@@ -527,6 +528,11 @@ select.text-input {
   transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
 .source-tab:hover { color: var(--ink); }
+.source-tab .tab-short { display: none; }
+@media (max-width: 480px) {
+  .source-tab .tab-long { display: none; }
+  .source-tab .tab-short { display: inline; }
+}
 .source-tab.is-active {
   background: linear-gradient(135deg, var(--indigo), #9f8cff);
   color: #fff;
@@ -1646,3 +1652,98 @@ select.text-input {
   gap: 10px;
 }
 .recovery-info { margin: 0; font-size: 0.92rem; color: var(--muted); }
+
+/* ── Neuro EN: plansze z nazwami struktur ────────────────────────────────── */
+#screen-neuro { max-width: 1180px; }
+.nb-intro { margin: 0 0 14px; color: var(--muted); max-width: 70ch; }
+.nb-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+.nb-title { margin: 0; font-size: clamp(1.2rem, 2.6vw, 1.6rem); }
+.nb-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.92rem; cursor: pointer; }
+.nb-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.nb-figure {
+  position: sticky;
+  top: calc(140px + env(safe-area-inset-top, 0px));
+  min-width: 0;
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+}
+.nb-svg { display: block; width: 100%; height: auto; }
+.nb-paper { fill: #fbf8f2; }
+.nb-mark { cursor: pointer; }
+.nb-lead { stroke: #22263a; stroke-width: 1.3; }
+.nb-dot { fill: #22263a; }
+.nb-pin { fill: #fff; stroke: #22263a; stroke-width: 2; transition: fill 0.15s ease; }
+.nb-num { font: 700 13px var(--font-body); fill: #22263a; pointer-events: none; }
+.nb-mark:hover .nb-pin { fill: #ece9ff; }
+.nb-mark.is-ok .nb-pin { fill: #45d483; }
+.nb-mark.is-typo .nb-pin { fill: #f4b95f; }
+.nb-mark.is-bad .nb-pin { fill: #ff8a7b; }
+.nb-mark.is-focus .nb-pin { fill: #7c6cff; stroke: #4b3fc4; stroke-width: 3; }
+.nb-mark.is-focus .nb-num { fill: #fff; }
+.nb-mark.is-focus .nb-lead { stroke: #7c6cff; stroke-width: 2.6; }
+.nb-mark.is-focus .nb-dot { fill: #7c6cff; stroke: #7c6cff; stroke-width: 3; }
+
+.nb-inputs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.nb-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.nb-row.is-focus { border-color: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-ring); }
+.nb-row.is-ok { background: var(--ok-soft); border-color: var(--ok); }
+.nb-row.is-typo { background: var(--amber-soft); border-color: var(--amber); }
+.nb-row.is-bad { background: var(--bad-soft); border-color: var(--bad); }
+.nb-n {
+  flex: 0 0 30px;
+  height: 30px;
+  margin-top: 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--indigo-soft);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 0.86rem;
+}
+.nb-field { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.nb-input { min-height: 42px; padding-block: 8px; }
+.nb-hint { display: none; font-size: 0.82rem; color: var(--muted); }
+.nb-inputs.show-hints .nb-hint { display: block; }
+.nb-fb { font-size: 0.86rem; font-weight: 650; overflow-wrap: anywhere; }
+.nb-fb:empty { display: none; }
+.nb-row.is-ok .nb-fb { color: var(--ok); }
+.nb-row.is-typo .nb-fb { color: var(--amber); }
+.nb-row.is-bad .nb-fb { color: var(--bad); }
+.nb-summary {
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--indigo-soft);
+  font-weight: 700;
+  text-align: center;
+}
+@media (max-width: 860px) {
+  .nb-layout { grid-template-columns: minmax(0, 1fr); }
+  /* Na telefonie rysunek zostaje przypięty, ale niski — pod nim jest miejsce na pola. */
+  #screen-neuro .session-bar { position: static; }
+  .nb-figure { top: calc(96px + env(safe-area-inset-top, 0px)); z-index: 5; background: #fbf8f2; }
+  .nb-svg { max-height: 36vh; margin-inline: auto; }
+  .nb-row { scroll-margin-top: calc(36vh + 112px); }
+}
