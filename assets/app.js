@@ -8,11 +8,11 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=15";
-import { JLDB as DB } from "./supabase.js?v=15";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer } from "./neuro.js?v=15";
+import { JLParsers as JLP } from "./parsers.js?v=16";
+import { JLDB as DB } from "./supabase.js?v=16";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers } from "./neuro.js?v=16";
 
-const APP_VERSION = "15";
+const APP_VERSION = "16";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -29,7 +29,7 @@ const state = {
   },
   pub: { items: [], query: "" },
   audio: { items: [], query: "", current: null, queue: [] },
-  neuro: { board: null, answers: {}, results: {}, revealed: false },
+  neuro: { board: null, mode: "type", answers: {}, results: {}, revealed: false, queue: [], busy: false },
   editing: null,
 };
 
@@ -699,24 +699,53 @@ function renderNeuroList() {
   ul.innerHTML = "";
   const best = neuroBest();
   NEURO_BOARDS.forEach((b) => {
-    const rec = best[b.id];
+    const rec = best[b.id], recMatch = best[b.id + ":match"], recTrans = best[b.id + ":trans"];
     const li = document.createElement("li");
     li.appendChild(libCard({
       kind: "file", icon: "✎", name: b.titlePl,
-      sub: `${b.title} · ${b.items.length} nazw` + (rec ? ` · najlepszy wynik ${rec.ok}/${rec.total}` : ""),
+      sub: `${b.title} · ${b.items.length} nazw` +
+        (rec ? ` · wpisywanie ${rec.ok}/${rec.total}` : "") +
+        (recMatch ? ` · łączenie ${recMatch.ok}/${recMatch.total}` : "") +
+        (recTrans ? ` · tłumaczenie ${recTrans.ok}/${recTrans.total}` : ""),
       onOpen: () => openNeuroBoard(b.id),
     }));
     ul.appendChild(li);
   });
 }
 
-function openNeuroBoard(id) {
+/** Wymowa angielska przez syntezę mowy przeglądarki (bez zewnętrznych usług). */
+function sayEn(text) {
+  if (!("speechSynthesis" in window)) return showToast("Ta przeglądarka nie obsługuje odczytu na głos.");
+  const u = new SpeechSynthesisUtterance(text);
+  const voice = speechSynthesis.getVoices().find((v) => /^en[-_]GB/i.test(v.lang)) ||
+    speechSynthesis.getVoices().find((v) => /^en/i.test(v.lang));
+  u.lang = voice ? voice.lang : "en-GB";
+  if (voice) u.voice = voice;
+  u.rate = 0.9;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+function openNeuroBoard(id, mode = state.neuro.mode || "type") {
   const board = boardById(id);
   if (!board) return;
-  state.neuro = { board, answers: {}, results: {}, revealed: false };
+  state.neuro = { board, mode, answers: {}, results: {}, revealed: false, queue: [], busy: false };
   $("#nb-title").textContent = board.titlePl;
   $("#nb-figure").innerHTML = boardSvgMarkup(board);
-  $$("#nb-figure .nb-mark").forEach((g) => g.addEventListener("click", () => focusNeuroInput(Number(g.dataset.n))));
+  $$("#nb-figure .nb-mark").forEach((g) => g.addEventListener("click", () => {
+    const n = Number(g.dataset.n);
+    if (state.neuro.mode === "match") pickNeuroMark(n);
+    else focusNeuroInput(n);
+  }));
+  const point = mode === "match", trans = mode === "trans";
+  $$(".nb-mode").forEach((b) => b.classList.toggle("is-active", b.dataset.mode === mode));
+  $$(".nb-type-only").forEach((el) => el.classList.toggle("hidden", mode !== "type"));
+  $$(".nb-point-only").forEach((el) => el.classList.toggle("hidden", !point));
+  $$(".nb-trans-only").forEach((el) => el.classList.toggle("hidden", !trans));
+  $("#nb-point").classList.toggle("hidden", !point);
+  $("#nb-trans").classList.toggle("hidden", !trans);
+  $("#nb-inputs").classList.toggle("hidden", mode !== "type");
+  $("#nb-hints-wrap").classList.toggle("hidden", trans);
 
   const ol = $("#nb-inputs");
   ol.innerHTML = "";
@@ -729,8 +758,10 @@ function openNeuroBoard(id) {
       `<div class="nb-field">` +
         `<input class="text-input nb-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" lang="en" aria-label="Nazwa nr ${it.n}" />` +
         `<span class="nb-hint">${escapeHtml(it.pl)}</span>` +
-        `<span class="nb-fb" aria-live="polite"></span>` +
+        `<span class="nb-fb-line"><span class="nb-fb" aria-live="polite"></span>` +
+        `<button class="nb-say" type="button" title="Wymowa" aria-label="Posłuchaj wymowy">🔊</button></span>` +
       `</div>`;
+    li.querySelector(".nb-say").addEventListener("click", () => sayEn(it.en[0]));
     const input = li.querySelector("input");
     input.addEventListener("focus", () => highlightNeuroMark(it.n));
     input.addEventListener("input", () => { state.neuro.answers[it.n] = input.value; });
@@ -745,7 +776,10 @@ function openNeuroBoard(id) {
   });
   $("#nb-hints").checked = false;
   $("#nb-inputs").classList.remove("show-hints");
-  updateNeuroStats();
+  $("#nb-point-pl").classList.add("hidden");
+  if (point) startNeuroMatch(board.items);
+  else if (trans) startNeuroTrans(board.items);
+  else updateNeuroStats();
   showScreen("screen-neuro");
 }
 
@@ -793,6 +827,9 @@ function setNeuroResult(it, res) {
   else if (res === "typo") fb.textContent = "≈ Prawie — pisownia: " + correct;
   else if (res === "bad") fb.textContent = "✕ Poprawnie: " + correct + alts;
   else fb.textContent = "";
+  // Dobrze podpisane znikają z listy (zostaje coraz mniej); numer na rysunku robi się zielony.
+  if (res === "ok") setTimeout(() => { if (state.neuro.results[it.n] === "ok") row.classList.add("is-done"); }, 900);
+  else row.classList.remove("is-done");
 }
 
 function gradeNeuroItem(it) {
@@ -853,9 +890,236 @@ function clearNeuro(onlyWrong) {
   updateNeuroStats();
   if (first !== null) focusNeuroInput(first);
 }
-$("#btn-nb-retry").addEventListener("click", () => clearNeuro(true));
-$("#btn-nb-reset").addEventListener("click", () => clearNeuro(false));
-$("#nb-hints").addEventListener("change", (e) => $("#nb-inputs").classList.toggle("show-hints", e.target.checked));
+$("#btn-nb-retry").addEventListener("click", () => {
+  if (state.neuro.mode === "type") return clearNeuro(true);
+  const wrong = state.neuro.board.items.filter((it) => state.neuro.results[it.n] !== "ok");
+  if (!wrong.length) return showToast("Nie ma błędnych — wszystko dobrze.", "ok");
+  if (state.neuro.mode === "trans") startNeuroTrans(wrong);
+  else startNeuroMatch(wrong);
+});
+$("#btn-nb-reset").addEventListener("click", () => {
+  if (state.neuro.mode === "match") startNeuroMatch(state.neuro.board.items);
+  else if (state.neuro.mode === "trans") startNeuroTrans(state.neuro.board.items);
+  else clearNeuro(false);
+});
+$("#nb-hints").addEventListener("change", (e) => {
+  $("#nb-inputs").classList.toggle("show-hints", e.target.checked);
+  $("#nb-point-pl").classList.toggle("hidden", !e.target.checked);
+});
+$$(".nb-mode").forEach((b) => b.addEventListener("click", () => {
+  if (state.neuro.board && b.dataset.mode !== state.neuro.mode) openNeuroBoard(state.neuro.board.id, b.dataset.mode);
+}));
+$("#btn-nb-say").addEventListener("click", () => {
+  const it = state.neuro.board.items.find((x) => x.n === state.neuro.sel);
+  if (it) sayEn(it.en[0]);
+});
+
+// ── Tryb „Połącz nazwy": wybierasz nazwę z puli i klikasz jej numer (lub odwrotnie) ──
+/** Start (lub powtórka części) — dobrze połączone wcześniej elementy zostają zaliczone. */
+function startNeuroMatch(items) {
+  const nb = state.neuro;
+  nb.queue = items.slice();
+  nb.matched = new Set(nb.board.items.filter((it) => !items.includes(it)).map((it) => it.n));
+  nb.sel = null;      // wybrana nazwa (n elementu)
+  nb.selMark = null;  // albo wybrany numer na rysunku
+  nb.busy = false;
+  items.forEach((it) => {
+    delete nb.results[it.n];
+    const mark = $(`#nb-figure .nb-mark[data-n="${it.n}"]`);
+    if (mark) mark.classList.remove("is-ok", "is-bad", "is-typo", "is-miss");
+  });
+  highlightNeuroMark(0);
+  const bank = $("#nb-bank");
+  bank.innerHTML = "";
+  shuffled(items).forEach((it) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "nb-chip";
+    chip.dataset.n = it.n;
+    chip.textContent = it.en[0];
+    chip.addEventListener("click", () => pickNeuroChip(it.n));
+    bank.appendChild(chip);
+  });
+  showMatchSelection();
+}
+
+function showMatchSelection(msg = "", kind = "") {
+  const nb = state.neuro;
+  const it = nb.sel != null ? nb.board.items.find((x) => x.n === nb.sel) : null;
+  $("#nb-point-term").textContent = it ? it.en[0] : (nb.selMark != null ? `Numer ${nb.selMark} → wybierz nazwę` : "Nic nie wybrano");
+  $("#nb-point-term").classList.toggle("is-empty", !it && nb.selMark == null);
+  $("#nb-point-pl").textContent = it ? it.pl : "";
+  $("#btn-nb-say").classList.toggle("hidden", !it);
+  $$("#nb-bank .nb-chip").forEach((c) => c.classList.toggle("is-sel", Number(c.dataset.n) === nb.sel));
+  highlightNeuroMark(nb.selMark != null ? nb.selMark : 0);
+  const fb = $("#nb-point-fb");
+  fb.textContent = msg;
+  fb.className = "nb-point-fb" + (kind ? " " + kind : "");
+  updateMatchStats();
+}
+
+function pickNeuroChip(n) {
+  const nb = state.neuro;
+  if (nb.busy || nb.matched.has(n)) return;
+  if (nb.selMark != null) return tryNeuroMatch(n, nb.selMark);
+  nb.sel = nb.sel === n ? null : n;
+  showMatchSelection();
+}
+
+function pickNeuroMark(n) {
+  const nb = state.neuro;
+  if (nb.busy || nb.matched.has(n)) return;
+  if (nb.sel != null) return tryNeuroMatch(nb.sel, n);
+  nb.selMark = nb.selMark === n ? null : n;
+  showMatchSelection();
+}
+
+/** chipN = nazwa wybrana z puli, markN = kliknięty numer. */
+function tryNeuroMatch(chipN, markN) {
+  const nb = state.neuro;
+  const it = nb.board.items.find((x) => x.n === chipN);
+  nb.sel = null;
+  nb.selMark = null;
+  if (chipN === markN) {
+    if (!nb.results[chipN]) nb.results[chipN] = "ok";
+    nb.matched.add(chipN);
+    const mark = $(`#nb-figure .nb-mark[data-n="${chipN}"]`);
+    mark.classList.add(nb.results[chipN] === "ok" ? "is-ok" : "is-typo");
+    const chip = $(`#nb-bank .nb-chip[data-n="${chipN}"]`);
+    if (chip) chip.remove();
+    showMatchSelection(`✓ ${it.en[0]} = nr ${chipN}`, "ok");
+    return;
+  }
+  // Pomyłka liczy się dla nazwy, którą próbowano dopasować.
+  nb.results[chipN] = "bad";
+  const chip = $(`#nb-bank .nb-chip[data-n="${chipN}"]`);
+  const miss = $(`#nb-figure .nb-mark[data-n="${markN}"]`);
+  if (chip) chip.classList.add("is-wrong");
+  if (miss) miss.classList.add("is-miss");
+  nb.busy = true;
+  showMatchSelection(`✕ „${it.en[0]}” to nie nr ${markN} — spróbuj jeszcze raz`, "bad");
+  setTimeout(() => {
+    if (state.neuro !== nb) return; // w międzyczasie otwarto inną planszę
+    if (chip) chip.classList.remove("is-wrong");
+    if (miss) miss.classList.remove("is-miss");
+    nb.busy = false;
+  }, 900);
+}
+
+// ── Tryb „Tłumacz": EN → PL lub PL → EN; struktura podświetlona na rysunku ──
+let neuroTransDir = "en-pl";
+
+function startNeuroTrans(items) {
+  const nb = state.neuro;
+  nb.queue = shuffled(items);
+  nb.idx = 0;
+  nb.checked = false;
+  items.forEach((it) => {
+    delete nb.results[it.n];
+    const mark = $(`#nb-figure .nb-mark[data-n="${it.n}"]`);
+    if (mark) mark.classList.remove("is-ok", "is-bad", "is-typo", "is-miss");
+  });
+  $$("#nb-trans .nb-dir .nb-chip").forEach((c) => c.classList.toggle("is-sel", c.dataset.dir === neuroTransDir));
+  showNeuroTrans();
+}
+
+function showNeuroTrans() {
+  const nb = state.neuro;
+  const it = nb.queue[nb.idx];
+  const toPl = neuroTransDir === "en-pl";
+  const input = $("#nb-trans-input");
+  nb.checked = false;
+  input.value = "";
+  input.disabled = !it;
+  input.lang = toPl ? "pl" : "en";
+  input.placeholder = toPl ? "po polsku…" : "in English…";
+  $("#nb-trans-fb").textContent = "";
+  $("#nb-trans-fb").className = "nb-point-fb";
+  $("#btn-nb-trans-check").classList.toggle("hidden", !it);
+  $("#btn-nb-trans-next").classList.add("hidden");
+  $("#nb-trans-label").textContent = toPl ? "Przetłumacz na polski:" : "Przetłumacz na angielski:";
+  $("#nb-trans-term").textContent = it ? (toPl ? it.en[0] : it.pl) : "Koniec planszy";
+  $("#btn-nb-trans-say").classList.toggle("hidden", !(it && toPl));
+  highlightNeuroMark(it ? it.n : 0);
+  updateTransStats();
+  if (it) input.focus({ preventScroll: true });
+}
+
+function checkNeuroTrans() {
+  const nb = state.neuro;
+  const it = nb.queue[nb.idx];
+  if (!it) return;
+  if (nb.checked) { nb.idx++; return showNeuroTrans(); }
+  const toPl = neuroTransDir === "en-pl";
+  const res = gradeAnswer($("#nb-trans-input").value, it, toPl ? "pl" : "en");
+  const r = res === "empty" ? "bad" : res;
+  nb.results[it.n] = r;
+  nb.checked = true;
+  const mark = $(`#nb-figure .nb-mark[data-n="${it.n}"]`);
+  if (mark) mark.classList.add("is-" + r);
+  const answer = toPl ? it.pl : it.en[0];
+  const fb = $("#nb-trans-fb");
+  fb.textContent = r === "ok" ? "✓ Dobrze — " + answer : r === "typo" ? "≈ Prawie — poprawnie: " + answer : "✕ Poprawnie: " + answer;
+  fb.className = "nb-point-fb " + (r === "ok" ? "ok" : r === "typo" ? "typo" : "bad");
+  $("#btn-nb-trans-say").classList.remove("hidden");
+  $("#btn-nb-trans-check").classList.add("hidden");
+  $("#btn-nb-trans-next").classList.remove("hidden");
+  updateTransStats();
+}
+
+function updateTransStats() {
+  const { board, results, queue, idx, checked } = state.neuro;
+  const total = board.items.length;
+  const ok = board.items.filter((it) => results[it.n] === "ok").length;
+  const done = board.items.filter((it) => results[it.n]).length;
+  $("#nb-count").textContent = `${done} / ${total}`;
+  $("#nb-score").textContent = `✓ ${ok}`;
+  $("#nb-progress").style.width = Math.round((done / total) * 100) + "%";
+  const sum = $("#nb-summary");
+  const finished = idx >= queue.length || (idx === queue.length - 1 && checked);
+  if (!finished) { sum.classList.add("hidden"); return; }
+  sum.classList.remove("hidden");
+  sum.textContent = ok === total
+    ? `Komplet! ${ok}/${total} przetłumaczonych bezbłędnie.`
+    : `Wynik: ${ok}/${total}. „Popraw błędne” zada jeszcze raz tylko pomylone.`;
+  if (done === total) saveNeuroBest(board.id + ":trans", ok, total);
+}
+
+$("#btn-nb-trans-check").addEventListener("click", checkNeuroTrans);
+$("#btn-nb-trans-next").addEventListener("click", checkNeuroTrans);
+$("#nb-trans-input").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  checkNeuroTrans();
+});
+$("#btn-nb-trans-say").addEventListener("click", () => {
+  const it = state.neuro.queue[state.neuro.idx];
+  if (it) sayEn(it.en[0]);
+});
+$$("#nb-trans .nb-dir .nb-chip").forEach((c) => c.addEventListener("click", () => {
+  if (c.dataset.dir === neuroTransDir) return;
+  neuroTransDir = c.dataset.dir;
+  startNeuroTrans(state.neuro.board.items);
+}));
+
+function updateMatchStats() {
+  const { board, results, matched } = state.neuro;
+  const total = board.items.length;
+  const ok = board.items.filter((it) => results[it.n] === "ok").length;
+  const done = matched ? matched.size : 0;
+  $("#nb-count").textContent = `${done} / ${total}`;
+  $("#nb-score").textContent = `✓ ${ok}`;
+  $("#nb-progress").style.width = Math.round((done / total) * 100) + "%";
+  const sum = $("#nb-summary");
+  if (done < total) { sum.classList.add("hidden"); return; }
+  sum.classList.remove("hidden");
+  const wrong = total - ok;
+  sum.textContent = wrong === 0
+    ? `Komplet! Wszystkie ${total} połączone bez pomyłki.`
+    : `Wszystko połączone — ${ok}/${total} za pierwszym razem. „Popraw błędne” powtórzy ${wrong} pomylone.`;
+  saveNeuroBest(board.id + ":match", ok, total);
+}
+
 $("#btn-nb-quit").addEventListener("click", () => { showScreen("screen-library"); renderNeuroList(); });
 
 // ── Modal (ogólny) + przenoszenie materiałów do/z folderów ───────────────────

@@ -67,9 +67,11 @@ const BRAIN_SAGITTAL_SVG = `
 <path d="${SAG_OUTLINE}" fill="none" stroke="${INK}" stroke-width="2.5"/>
 <path d="M 214 206 C 200 180 230 150 300 146 C 370 142 430 150 450 182 C 460 198 452 214 434 214 C 420 214 418 200 408 194 C 380 178 330 176 290 180 C 254 184 240 196 244 210 C 240 224 222 222 214 206 Z"
   fill="#fbf2d8" stroke="${INK}" stroke-width="2"/>
-<path d="M 312 258 C 304 272 306 290 318 300 C 302 312 302 346 326 358 C 330 380 334 405 338 438 L 368 438 C 368 405 370 380 374 360 C 388 350 392 330 388 306 C 394 290 394 272 386 258 Z"
+<path d="M 312 258 C 304 272 306 290 318 300 C 302 312 302 346 326 358 C 330 380 334 405 338 440 L 340 480 L 366 480 L 368 440 C 368 405 370 380 374 360 C 388 350 392 330 388 306 C 394 290 394 272 386 258 Z"
   fill="#e9d3bd" stroke="${INK}" stroke-width="2"/>
 <path d="M 318 300 C 340 304 366 304 388 306 M 326 358 C 342 362 360 362 374 360" ${FINE}/>
+<path d="M 334 406 C 346 409 358 409 370 406" fill="none" stroke="${INK}" stroke-width="1.6" stroke-dasharray="4 3"/>
+<path d="M 306 262 L 298 262 L 298 404 L 306 404" fill="none" stroke="${INK}" stroke-width="2"/>
 <path d="M 388 306 L 404 324 L 384 346 C 390 332 390 318 388 306 Z" fill="#b9e0f0" stroke="${INK}" stroke-width="1.5"/>
 <ellipse cx="342" cy="244" rx="40" ry="22" fill="#f6c6a2" stroke="${INK}" stroke-width="2"/>
 <path d="M 432 210 C 410 228 370 232 330 230 C 300 228 284 240 284 258" fill="none" stroke="${INK}" stroke-width="9" stroke-linecap="round"/>
@@ -78,7 +80,9 @@ const BRAIN_SAGITTAL_SVG = `
 <path d="M 268 280 C 258 276 246 278 238 283 C 246 290 260 290 270 286 Z" fill="#fff2a6" stroke="${INK}" stroke-width="1.5"/>
 <path d="M 286 282 C 285 292 283 298 282 304" fill="none" stroke="${INK}" stroke-width="2.4"/>
 <ellipse cx="281" cy="312" rx="11" ry="9" fill="#e7b2d8" stroke="${INK}" stroke-width="1.6"/>
-<ellipse cx="396" cy="252" rx="8" ry="6" fill="#c7d98f" stroke="${INK}" stroke-width="1.5"/>`;
+<ellipse cx="396" cy="252" rx="8" ry="6" fill="#c7d98f" stroke="${INK}" stroke-width="1.5"/>
+<path d="M 478 236 C 500 244 500 266 482 272 C 466 278 446 276 430 280 C 418 283 412 276 420 270 C 436 264 456 266 468 258 C 476 252 470 244 462 242 Z"
+  fill="#d7b98a" fill-opacity="0.8" stroke="${INK}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
 
 // ── Neuron ───────────────────────────────────────────────────────────────────
 function myelin() {
@@ -141,6 +145,85 @@ ${SYN_DOTS}
 ${receptor(270)}${receptor(320)}${receptor(370)}${receptor(230)}
 <path d="M 130 420 C 180 380 460 380 510 420" fill="none" stroke="${INK}" stroke-width="1.2" opacity="0.4"/>`;
 
+// ── Pomocnicze: drzewko rozgałęzień (dendryty / zakończenia aksonu) ─────────
+/** Ścieżka SVG drzewka: kąt w stopniach (-90 = w górę, 90 = w dół). */
+function tree(x, y, angle, len, depth, spread = 28) {
+  const rad = (angle * Math.PI) / 180;
+  const x2 = +(x + Math.cos(rad) * len).toFixed(1);
+  const y2 = +(y + Math.sin(rad) * len).toFixed(1);
+  let d = `M ${x} ${y} L ${x2} ${y2} `;
+  if (depth > 0) {
+    d += tree(x2, y2, angle - spread, len * 0.68, depth - 1, spread);
+    d += tree(x2, y2, angle + spread, len * 0.68, depth - 1, spread);
+  }
+  return d;
+}
+const BRANCH = (d, w = 2.2) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w}" stroke-linecap="round"/>`;
+const SOMA = "#9ec5ea";
+const MYELIN = "#e7a873";
+function myelinV(x, y1, y2) {
+  let s = "";
+  for (let y = y1; y + 26 <= y2; y += 34) s += `<rect x="${x - 5}" y="${y}" width="10" height="26" rx="5" fill="${MYELIN}" stroke="${INK}" stroke-width="1.2"/>`;
+  return s;
+}
+
+// ── Typy neuronów — kształt ──────────────────────────────────────────────────
+const SHAPES_SVG = `
+${BRANCH(tree(90, 120, -90, 34, 3) + "M 90 120 L 90 168 M 90 222 L 90 300 " + tree(90, 300, 90, 30, 3))}
+<ellipse cx="90" cy="195" rx="17" ry="28" fill="${SOMA}" stroke="${INK}" stroke-width="2"/>
+<circle cx="90" cy="195" r="7" fill="#e4f0fb" stroke="${INK}" stroke-width="1.2"/>
+${BRANCH(tree(250, 90, -90, 30, 3) + "M 250 90 L 250 300 M 250 200 L 232 200 " + tree(250, 300, 90, 30, 3))}
+<circle cx="212" cy="200" r="21" fill="${SOMA}" stroke="${INK}" stroke-width="2"/>
+<circle cx="210" cy="200" r="7" fill="#e4f0fb" stroke="${INK}" stroke-width="1.2"/>
+${BRANCH(tree(410, 132, -90, 26, 2) + tree(385, 140, -150, 26, 2) + tree(435, 140, -30, 26, 2) + tree(382, 170, 160, 26, 2) + tree(438, 170, 20, 26, 2) + "M 410 182 L 410 300 " + tree(410, 300, 90, 30, 3, 22))}
+<path d="M 410 128 L 436 140 L 440 168 L 410 186 L 380 168 L 384 140 Z" fill="${SOMA}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="410" cy="157" r="8" fill="#e4f0fb" stroke="${INK}" stroke-width="1.2"/>
+${BRANCH("M 560 186 L 560 60 " + tree(560, 150, -130, 26, 2) + tree(560, 150, -50, 26, 2) + tree(560, 110, -135, 22, 2) + tree(560, 110, -45, 22, 2) + tree(560, 60, -90, 18, 2) + tree(548, 214, 150, 30, 2) + tree(572, 214, 30, 30, 2) + "M 560 216 L 560 330", 1.8)}
+<path d="M 560 184 L 574 216 L 546 216 Z" fill="${SOMA}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>`;
+
+// ── Typy neuronów — funkcja ──────────────────────────────────────────────────
+const FUNCTION_SVG = `
+${BRANCH(tree(110, 70, -90, 22, 2) + tree(90, 76, -140, 24, 2) + tree(130, 76, -40, 24, 2) + tree(88, 100, 170, 24, 2) + tree(132, 100, 10, 24, 2) + "M 110 110 L 110 330 " + tree(110, 330, 90, 30, 3, 26))}
+<path d="M 110 62 C 126 66 136 80 134 96 C 130 110 120 114 110 114 C 98 114 88 108 86 96 C 84 80 94 66 110 62 Z" fill="#f2c48f" stroke="${INK}" stroke-width="2"/>
+<circle cx="110" cy="90" r="8" fill="#b9a1d6" stroke="${INK}" stroke-width="1.2"/>
+${myelinV(110, 140, 320)}
+${BRANCH(tree(320, 100, -90, 30, 3, 32) + "M 320 100 L 320 152 M 320 212 L 320 330 " + tree(320, 330, 90, 30, 3, 26))}
+<ellipse cx="320" cy="182" rx="22" ry="31" fill="#f2c48f" stroke="${INK}" stroke-width="2"/>
+<circle cx="320" cy="186" r="8" fill="#b9a1d6" stroke="${INK}" stroke-width="1.2"/>
+${myelinV(320, 228, 320)}
+${BRANCH(tree(530, 80, -90, 30, 3, 32) + "M 530 80 L 530 330 M 530 210 L 508 210 " + tree(530, 330, 90, 30, 3, 26))}
+<circle cx="488" cy="210" r="22" fill="#f2c48f" stroke="${INK}" stroke-width="2"/>
+<circle cx="486" cy="210" r="8" fill="#b9a1d6" stroke="${INK}" stroke-width="1.2"/>
+${myelinV(530, 110, 196)}${myelinV(530, 226, 320)}`;
+
+// ── Podziały układu nerwowego (schemat) ──────────────────────────────────────
+const DIV_BOXES = [
+  // [x, y, szer., opis, kolor]
+  [320, 40, 240, "Biological basis of experience", "#e8e4fb"],
+  [160, 135, 180, "To and from the CNS", "#dbe8f8"],
+  [480, 135, 180, "Directs and responds", "#d9efe7"],
+  [85, 240, 150, "Senses &amp; muscles", "#dbe8f8"],
+  [245, 240, 150, "Life functions", "#dbe8f8"],
+  [400, 240, 140, "Relays signals", "#d9efe7"],
+  [555, 240, 140, "Directs activity", "#d9efe7"],
+  [165, 345, 150, "Readies for threat", "#f8e1dc"],
+  [335, 345, 150, "Calms the body", "#f8e1dc"],
+];
+const DIVISIONS_SVG = `
+<path d="M 320 62 L 320 90 M 160 90 L 480 90 M 160 90 L 160 113 M 480 90 L 480 113
+  M 160 157 L 160 200 M 85 200 L 245 200 M 85 200 L 85 218 M 245 200 L 245 218
+  M 480 157 L 480 200 M 400 200 L 555 200 M 400 200 L 400 218 M 555 200 L 555 218
+  M 245 262 L 245 305 M 165 305 L 335 305 M 165 305 L 165 323 M 335 305 L 335 323" fill="none" stroke="${INK}" stroke-width="1.6"/>
+${DIV_BOXES.map(([x, y, w, desc, fill]) =>
+  `<rect x="${x - w / 2}" y="${y - 22}" width="${w}" height="44" rx="10" fill="${fill}" stroke="${INK}" stroke-width="1.6"/>` +
+  `<text x="${x - w / 2 + 40}" y="${y + 1}" text-anchor="start" dominant-baseline="central" font-size="11.5" font-style="italic" fill="#4a5068" font-family="system-ui, sans-serif">${desc}</text>`).join("")}
+<defs><marker id="nb-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="${INK}"/></marker></defs>
+<path d="M 258 126 L 382 126" fill="none" stroke="#2f7d5b" stroke-width="2.4" marker-end="url(#nb-arrow)"/>
+<path d="M 382 146 L 258 146" fill="none" stroke="#b5523f" stroke-width="2.4" marker-end="url(#nb-arrow)"/>`;
+
+/** Warianty nazwy: „somatic" + „somatic nervous system" + „somatic division"… */
+const ns = (base, ...extra) => [base + " nervous system", base, base + " division", base + " system", ...extra];
+
 export const NEURO_BOARDS = [
   {
     id: "brain-lateral",
@@ -169,7 +252,7 @@ export const NEURO_BOARDS = [
     id: "brain-sagittal",
     title: "Brain — midsagittal section",
     titlePl: "Mózg — przekrój pośrodkowy",
-    viewBox: "0 0 640 450",
+    viewBox: "0 0 640 490",
     svg: BRAIN_SAGITTAL_SVG,
     items: [
       { n: 1, en: ["corpus callosum"], pl: "ciało modzelowate", x: 330, y: 160, lx: 330, ly: 18 },
@@ -177,14 +260,18 @@ export const NEURO_BOARDS = [
       { n: 3, en: ["fornix"], pl: "sklepienie", x: 392, y: 222, lx: 600, ly: 180 },
       { n: 4, en: ["thalamus"], pl: "wzgórze", x: 348, y: 248, lx: 600, ly: 218 },
       { n: 5, en: ["hypothalamus"], pl: "podwzgórze", x: 294, y: 266, lx: 90, ly: 250 },
-      { n: 6, en: ["pituitary gland", "pituitary", "hypophysis"], pl: "przysadka mózgowa", x: 281, y: 314, lx: 150, ly: 380 },
+      { n: 6, en: ["pituitary gland", "pituitary", "hypophysis"], pl: "przysadka mózgowa", x: 281, y: 314, lx: 110, ly: 370 },
       { n: 7, en: ["pineal gland", "pineal body", "epiphysis"], pl: "szyszynka (nasada)", x: 396, y: 252, lx: 600, ly: 256 },
       { n: 8, en: ["optic chiasm", "optic chiasma"], pl: "skrzyżowanie wzrokowe", x: 252, y: 284, lx: 90, ly: 310 },
-      { n: 9, en: ["midbrain", "mesencephalon"], pl: "śródmózgowie", x: 348, y: 282, lx: 240, ly: 420 },
-      { n: 10, en: ["pons"], pl: "most", x: 345, y: 332, lx: 420, ly: 425 },
-      { n: 11, en: ["medulla oblongata", "medulla"], pl: "rdzeń przedłużony", x: 356, y: 392, lx: 290, ly: 440 },
+      { n: 9, en: ["midbrain", "mesencephalon"], pl: "śródmózgowie", x: 345, y: 284, lx: 262, ly: 420 },
+      { n: 10, en: ["pons"], pl: "most", x: 340, y: 332, lx: 250, ly: 452 },
+      { n: 11, en: ["medulla oblongata", "medulla"], pl: "rdzeń przedłużony", x: 352, y: 385, lx: 300, ly: 476 },
       { n: 12, en: ["cerebellum"], pl: "móżdżek", x: 500, y: 330, lx: 610, ly: 360 },
-      { n: 13, en: ["fourth ventricle", "4th ventricle"], pl: "komora czwarta", x: 394, y: 324, lx: 520, ly: 425 },
+      { n: 13, en: ["fourth ventricle", "4th ventricle"], pl: "komora czwarta", x: 394, y: 324, lx: 520, ly: 430 },
+      { n: 14, en: ["hippocampus"], pl: "hipokamp", x: 470, y: 262, lx: 612, ly: 300 },
+      { n: 15, en: ["cerebral cortex", "cortex", "neocortex"], pl: "kora mózgowa", x: 548, y: 160, lx: 612, ly: 120 },
+      { n: 16, en: ["brainstem", "brain stem"], pl: "pień mózgu", x: 298, y: 333, lx: 60, ly: 410 },
+      { n: 17, en: ["spinal cord"], pl: "rdzeń kręgowy", x: 353, y: 455, lx: 440, ly: 476 },
     ],
   },
   {
@@ -198,12 +285,12 @@ export const NEURO_BOARDS = [
       { n: 2, en: ["cell body", "soma", "perikaryon"], pl: "ciało komórki (perykarion)", x: 126, y: 234, lx: 50, ly: 350 },
       { n: 3, en: ["nucleus"], pl: "jądro komórkowe", x: 156, y: 214, lx: 250, ly: 345 },
       { n: 4, en: ["axon hillock"], pl: "wzgórek aksonu", x: 202, y: 210, lx: 230, ly: 120 },
-      { n: 5, en: ["axon"], pl: "akson (neuryt)", x: 202 + 62 * 4 + 58, y: 210, lx: 480, ly: 300 },
+      { n: 5, en: ["axon", "nerve fiber", "nerve fibre"], pl: "akson (neuryt, włókno nerwowe)", x: 202 + 62 * 4 + 58, y: 210, lx: 480, ly: 300 },
       { n: 6, en: ["myelin sheath", "myelin"], pl: "osłonka mielinowa", x: 350, y: 220, lx: 330, ly: 300 },
       { n: 7, en: ["node of ranvier", "nodes of ranvier", "ranvier node"], pl: "przewężenie Ranviera", x: 386, y: 210, lx: 410, ly: 110 },
       { n: 8, en: ["schwann cell", "schwann cells"], pl: "komórka Schwanna", x: 295, y: 198, lx: 300, ly: 110 },
       { n: 9, en: ["axon terminal", "axon terminals", "terminal branches", "telodendria"], pl: "zakończenia aksonu (telodendron)", x: 548, y: 214, lx: 610, ly: 120 },
-      { n: 10, en: ["synaptic bouton", "terminal button", "terminal bouton", "synaptic knob", "synaptic terminal", "terminal buttons"], pl: "kolbka synaptyczna", x: 563, y: 270, lx: 610, ly: 330 },
+      { n: 10, en: ["synaptic bouton", "terminal button", "terminal bouton", "synaptic knob", "synaptic terminal", "terminal buttons", "synapse"], pl: "kolbka synaptyczna", x: 563, y: 270, lx: 610, ly: 330 },
     ],
   },
   {
@@ -224,6 +311,56 @@ export const NEURO_BOARDS = [
       { n: 9, en: ["voltage-gated calcium channel", "calcium channel", "voltage gated calcium channel", "voltage-gated ca channel"], pl: "kanał wapniowy bramkowany napięciem", x: 190, y: 210, lx: 60, ly: 180 },
       { n: 10, en: ["presynaptic terminal", "axon terminal", "presynaptic neuron", "synaptic bouton", "terminal button"], pl: "zakończenie presynaptyczne (kolbka)", x: 320, y: 50, lx: 320, ly: 14 },
       { n: 11, en: ["postsynaptic neuron", "postsynaptic cell", "dendrite"], pl: "neuron postsynaptyczny (dendryt)", x: 320, y: 360, lx: 320, ly: 415 },
+    ],
+  },
+  {
+    id: "neuron-shapes",
+    title: "Types of neurons — shape",
+    titlePl: "Typy neuronów — kształt",
+    viewBox: "0 0 640 400",
+    svg: SHAPES_SVG,
+    items: [
+      { n: 1, en: ["bipolar neuron", "bipolar", "bipolar cell"], pl: "neuron dwubiegunowy", x: 74, y: 200, lx: 40, ly: 380 },
+      { n: 2, en: ["unipolar neuron", "unipolar", "unipolar cell", "pseudounipolar neuron", "pseudo unipolar neuron"], pl: "neuron jednobiegunowy (pseudojednobiegunowy)", x: 200, y: 214, lx: 200, ly: 380 },
+      { n: 3, en: ["multipolar neuron", "multipolar", "multipolar cell"], pl: "neuron wielobiegunowy", x: 396, y: 172, lx: 470, ly: 380 },
+      { n: 4, en: ["pyramidal cell", "pyramidal neuron", "pyramidal"], pl: "komórka piramidowa", x: 560, y: 208, lx: 612, ly: 380 },
+    ],
+  },
+  {
+    id: "neuron-functions",
+    title: "Types of neurons — function",
+    titlePl: "Typy neuronów — funkcja",
+    viewBox: "0 0 640 440",
+    svg: FUNCTION_SVG,
+    items: [
+      { n: 1, en: ["motor neuron", "motoneuron", "efferent neuron", "motor nerve cell"], pl: "neuron ruchowy (eferentny)", x: 110, y: 380, lx: 110, ly: 422 },
+      { n: 2, en: ["interneuron", "relay neuron", "association neuron", "intermediate neuron", "connector neuron"], pl: "interneuron (neuron pośredniczący)", x: 320, y: 380, lx: 320, ly: 422 },
+      { n: 3, en: ["sensory neuron", "afferent neuron", "receptor neuron"], pl: "neuron czuciowy (aferentny)", x: 530, y: 380, lx: 530, ly: 422 },
+      { n: 4, en: ["cell body", "soma", "perikaryon"], pl: "ciało komórki", x: 126, y: 98, lx: 200, ly: 50 },
+      { n: 5, en: ["dendrite", "dendrites"], pl: "dendryt", x: 320, y: 128, lx: 410, ly: 110 },
+      { n: 6, en: ["axon", "nerve fiber", "nerve fibre"], pl: "akson", x: 534, y: 285, lx: 612, ly: 280 },
+      { n: 7, en: ["axon terminal", "axon terminals", "terminal branches", "telodendria"], pl: "zakończenie aksonu", x: 329, y: 378, lx: 420, ly: 330 },
+      { n: 8, en: ["myelin sheath", "myelin"], pl: "osłonka mielinowa", x: 115, y: 220, lx: 200, ly: 230 },
+    ],
+  },
+  {
+    id: "ns-divisions",
+    title: "Divisions of the nervous system",
+    titlePl: "Podziały układu nerwowego",
+    viewBox: "0 0 640 400",
+    svg: DIVISIONS_SVG,
+    items: [
+      { n: 1, en: ["nervous system"], pl: "układ nerwowy", x: 220, y: 40, lx: 220, ly: 40 },
+      { n: 2, en: ns("peripheral", "pns"), pl: "obwodowy układ nerwowy", x: 90, y: 135, lx: 90, ly: 135 },
+      { n: 3, en: ns("central", "cns"), pl: "ośrodkowy (centralny) układ nerwowy", x: 410, y: 135, lx: 410, ly: 135 },
+      { n: 4, en: ns("somatic", "sns"), pl: "somatyczny układ nerwowy", x: 30, y: 240, lx: 30, ly: 240 },
+      { n: 5, en: ns("autonomic", "ans"), pl: "autonomiczny układ nerwowy", x: 190, y: 240, lx: 190, ly: 240 },
+      { n: 6, en: ["spinal cord"], pl: "rdzeń kręgowy", x: 350, y: 240, lx: 350, ly: 240 },
+      { n: 7, en: ["brain"], pl: "mózg (mózgowie)", x: 505, y: 240, lx: 505, ly: 240 },
+      { n: 8, en: ns("sympathetic"), pl: "układ współczulny (walcz lub uciekaj)", x: 110, y: 345, lx: 110, ly: 345 },
+      { n: 9, en: ns("parasympathetic"), pl: "układ przywspółczulny (odpoczynek i trawienie)", x: 280, y: 345, lx: 280, ly: 345 },
+      { n: 10, en: ["afferent", "afferent pathway", "afferent neurons", "afferent fibers", "afferent nerves", "sensory", "sensory pathway"], pl: "aferentny = czuciowy, do OUN", x: 320, y: 126, lx: 320, ly: 106 },
+      { n: 11, en: ["efferent", "efferent pathway", "efferent neurons", "efferent fibers", "efferent nerves", "motor", "motor pathway"], pl: "eferentny = ruchowy, z OUN", x: 320, y: 146, lx: 320, ly: 168 },
     ],
   },
 ];
@@ -271,11 +408,17 @@ function editDistance(a, b) {
   return prev[n];
 }
 
+/** Akceptowane odpowiedzi PL: całość, część przed nawiasem i warianty w nawiasie / po „=". */
+export function plAnswers(item) {
+  const parts = item.pl.split(/[()=]/).map((p) => p.split(",")[0].trim()).filter((p) => p.length >= 2);
+  return [item.pl, ...parts];
+}
+
 /** "ok" | "typo" (drobna literówka — nie liczy się jako poprawna) | "bad" | "empty". */
-export function gradeAnswer(input, item) {
+export function gradeAnswer(input, item, lang = "en") {
   const v = normalizeAnswer(input);
   if (!v) return "empty";
-  const accepted = item.en.map(normalizeAnswer);
+  const accepted = (lang === "pl" ? plAnswers(item) : item.en).map(normalizeAnswer);
   if (accepted.includes(v)) return "ok";
   const tol = (w) => (w.length >= 10 ? 2 : w.length >= 5 ? 1 : 0);
   if (accepted.some((a) => editDistance(v, a) <= tol(a))) return "typo";
