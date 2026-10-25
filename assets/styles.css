@@ -1824,3 +1824,50 @@ select.text-input {
   .nb-svg { max-height: 36vh; margin-inline: auto; }
   .nb-row { scroll-margin-top: calc(36vh + 112px); }
 }
+
+/* ── Neuro EN: uzupełnianie zdań ─────────────────────────────────────────── */
+#screen-fill { max-width: 900px; margin-inline: auto; }
+.fill-bank-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.nb-chip.is-used { opacity: 0.45; text-decoration: line-through; }
+.fill-text { margin: 0; padding-left: 1.6em; display: flex; flex-direction: column; gap: 14px; }
+.fill-sent {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  line-height: 2.3;
+}
+.fill-sent::marker { font-weight: 800; color: var(--muted); }
+.fill-blank { display: inline-flex; flex-direction: column; vertical-align: top; line-height: 1.2; margin: 2px 2px; }
+.fill-input {
+  max-width: 100%;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 0;
+  border-bottom: 2px solid var(--indigo);
+  border-radius: 8px 8px 0 0;
+  background: var(--indigo-soft);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+}
+.fill-input:focus { outline: none; box-shadow: 0 0 0 3px var(--indigo-ring); }
+.fill-blank.is-ok .fill-input { background: var(--ok-soft); border-color: var(--ok); }
+.fill-blank.is-typo .fill-input { background: var(--amber-soft); border-color: var(--amber); }
+.fill-blank.is-bad .fill-input { background: var(--bad-soft); border-color: var(--bad); }
+.fill-fix { font-size: 0.8rem; font-weight: 700; color: var(--bad); }
+.fill-fix:empty { display: none; }
+.fill-blank.is-typo .fill-fix { color: var(--amber); }
+@media (max-width: 680px) {
+  .fill-text { padding-left: 1.3em; }
+  .fill-sent { padding: 12px; font-size: 0.95rem; }
+}

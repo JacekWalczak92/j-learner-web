@@ -33,11 +33,11 @@ Edge Function `publish-material`).
 
 | Plik | Rola |
 |---|---|
-| `index.html` | Cały markup; ekrany jako `<section class="screen">`: `screen-auth`, `screen-library` (zakładki: Moje materiały / Od autora / Audio / Neuro EN), `screen-editor`, `screen-ready`, `screen-test`, `screen-flash`, `screen-results`, `screen-neuro`. CSP w `<meta>`. |
+| `index.html` | Cały markup; ekrany jako `<section class="screen">`: `screen-auth`, `screen-library` (zakładki: Moje materiały / Od autora / Audio / Neuro EN), `screen-editor`, `screen-ready`, `screen-test`, `screen-flash`, `screen-results`, `screen-neuro`, `screen-fill`. CSP w `<meta>`. |
 | `assets/app.js` (~1700 linii) | Cała logika UI: logowanie/rejestracja/reset hasła, biblioteka (foldery, kategorie, wyszukiwarka, sortowanie), modale, edytor, ekran startu sesji, silniki trybów nauki, zapis postępu, wyniki. |
 | `assets/supabase.js` | Warstwa danych, eksportuje `JLDB`: sesja (localStorage + odświeżanie tokenu), `rest()`, foldery, materiały, postęp. |
 | `assets/parsers.js` | Eksportuje `JLParsers`: `parseTestText`, `parseFlashcardText`, `detectMaterialType` itd. |
-| `assets/neuro.js` | Eksportuje `NEURO_BOARDS` (plansze „Neuro EN": własne SVG, elementy `{ n, en[], pl, x, y, lx, ly }`), `boardSvgMarkup`, `gradeAnswer` (EN lub PL przez `plAnswers`). UI w `app.js` (sekcja NEURO EN): tryby `type` / `match` / `trans`; najlepsze wyniki w localStorage `jl_neuro_best` (klucze `id`, `id:match`, `id:trans`); błędy do „Powtórki błędów” w `jl_neuro_mistakes` (`boardId:n`). Fiszki: `neuroVocabDecks()` (plansze + `GENERAL_TERMS`) → `openNeuroDeck` tworzy `state.material` z `id: null` i używa zwykłego `renderReady`. |
+| `assets/neuro.js` | Eksportuje `NEURO_BOARDS` (plansze „Neuro EN": własne SVG, elementy `{ n, en[], pl, x, y, lx, ly }`), `boardSvgMarkup`, `gradeAnswer` (EN lub PL przez `plAnswers`). UI w `app.js` (sekcja NEURO EN): tryby `type` / `match` / `trans`; najlepsze wyniki w localStorage `jl_neuro_best` (klucze `id`, `id:match`, `id:trans`); błędy do „Powtórki błędów” w `jl_neuro_mistakes` (`boardId:n`). Fiszki: `neuroVocabDecks()` (plansze + `GENERAL_TERMS`) → `openNeuroDeck` tworzy `state.material` z `id: null` i używa zwykłego `renderReady`. Zdania z lukami: `FILL_SETS` (luka `{a|b}`, `{@grupa:a}` = dowolna kolejność w grupie), `parseFillSentence`, `gradeFillBlanks`; ekran `screen-fill`. |
 | `assets/config.js` | `JL_CONFIG` = `{ supabaseUrl, supabaseAnonKey }`. |
 | `assets/styles.css` | Cały wygląd (~1600 linii). |
 | `sw.js` | Service worker: cache shellu (cache-first dla zasobów z `?v=`). |
@@ -96,7 +96,7 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **17**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **18**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
 2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js` i `neuro.js` oraz `APP_VERSION`,
