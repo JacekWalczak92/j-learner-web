@@ -3,7 +3,7 @@
 //  Eksportuje JLDB. Tokeny trzymane w localStorage (logowanie trwałe).
 // ============================================================================
 
-import { JL_CONFIG } from "./config.js?v=16";
+import { JL_CONFIG } from "./config.js?v=17";
 
 const CFG = JL_CONFIG || {};
 const SB_URL = (CFG.supabaseUrl || "").replace(/\/+$/, "");

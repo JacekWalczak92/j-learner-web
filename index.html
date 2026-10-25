@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="assets/styles.css?v=16" />
+  <link rel="stylesheet" href="assets/styles.css?v=17" />
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
@@ -128,9 +128,20 @@
       </div>
 
       <div id="tab-neuro" class="hidden">
-        <p class="nb-intro">Angielskie nazwy struktur mózgu i neuronu. Na planszy wpisz nazwę dla każdego numeru —
-          aplikacja sprawdzi odpowiedź (wielkość liter i spacje nie mają znaczenia) i pokaże poprawną.</p>
-        <ul id="neuro-list" class="lib-list"></ul>
+        <div class="nb-modes" role="tablist" aria-label="Neuro EN">
+          <button class="nb-mode neuro-view is-active" role="tab" type="button" data-view="boards">🧠 Plansze</button>
+          <button class="nb-mode neuro-view" role="tab" type="button" data-view="cards">🃏 Fiszki</button>
+        </div>
+        <div id="neuro-boards">
+          <p class="nb-intro">Angielskie nazwy struktur mózgu i neuronu. Na planszy wpisz nazwę dla każdego numeru —
+            aplikacja sprawdzi odpowiedź (wielkość liter i spacje nie mają znaczenia) i pokaże poprawną.</p>
+          <ul id="neuro-list" class="lib-list"></ul>
+        </div>
+        <div id="neuro-cards" class="hidden">
+          <p class="nb-intro">Fiszki ze słówkami: angielski z przodu, polski z tyłu. W opcjach przed startem
+            zaznacz „Odwróć strony”, żeby ćwiczyć z polskiego na angielski.</p>
+          <ul id="neuro-decks" class="lib-list"></ul>
+        </div>
       </div>
 
       <p id="lib-status" class="status" role="status" aria-live="polite"></p>
@@ -367,6 +378,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=16"></script>
+  <script type="module" src="assets/app.js?v=17"></script>
 </body>
 </html>

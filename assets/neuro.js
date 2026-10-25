@@ -424,3 +424,72 @@ export function gradeAnswer(input, item, lang = "en") {
   if (accepted.some((a) => editDistance(v, a) <= tol(a))) return "typo";
   return "bad";
 }
+
+// ── Fiszki ze słówkami ───────────────────────────────────────────────────────
+// Pojęcia spoza plansz (przód EN, tył PL); alternatywne nazwy EN po „|".
+const GENERAL_TERMS = [
+  ["neuron|nerve cell", "neuron (komórka nerwowa)"],
+  ["glial cell|glia|neuroglia", "komórka glejowa (glej)"],
+  ["grey matter|gray matter", "istota szara"],
+  ["white matter", "istota biała"],
+  ["cerebral hemisphere|hemisphere", "półkula mózgu"],
+  ["lobe", "płat"],
+  ["gyrus", "zakręt (mózgu)"],
+  ["sulcus", "bruzda"],
+  ["fissure", "szczelina"],
+  ["action potential", "potencjał czynnościowy"],
+  ["resting potential|resting membrane potential", "potencjał spoczynkowy"],
+  ["depolarization|depolarisation", "depolaryzacja"],
+  ["hyperpolarization|hyperpolarisation", "hiperpolaryzacja"],
+  ["excitatory", "pobudzający"],
+  ["inhibitory", "hamujący"],
+  ["reuptake", "wychwyt zwrotny"],
+  ["neuroplasticity|plasticity", "neuroplastyczność"],
+  ["lateralization|lateralisation", "lateralizacja"],
+  ["cerebrospinal fluid|CSF", "płyn mózgowo-rdzeniowy"],
+  ["ventricle", "komora (mózgu)"],
+  ["meninges", "opony mózgowo-rdzeniowe"],
+  ["blood-brain barrier", "bariera krew–mózg"],
+  ["limbic system", "układ limbiczny"],
+  ["amygdala", "ciało migdałowate"],
+  ["basal ganglia", "jądra podstawy"],
+  ["cranial nerves", "nerwy czaszkowe"],
+  ["reflex arc", "łuk odruchowy"],
+  ["dopamine", "dopamina"],
+  ["serotonin", "serotonina"],
+  ["acetylcholine", "acetylocholina"],
+  ["GABA|gamma-aminobutyric acid", "GABA (kwas γ-aminomasłowy)"],
+  ["glutamate", "glutaminian"],
+  ["norepinephrine|noradrenaline", "noradrenalina"],
+  ["fight-or-flight response", "reakcja „walcz lub uciekaj”"],
+  ["rest and digest", "„odpoczywaj i traw” (układ przywspółczulny)"],
+  ["homeostasis", "homeostaza"],
+];
+
+function toCard(en, pl, source) {
+  const note = [source, en.length > 1 ? "Inne nazwy: " + en.slice(1).join(", ") : ""].filter(Boolean).join(" · ");
+  return { en: en[0], pl, note };
+}
+
+/** Talie fiszek: wszystkie słówka, osobno każda plansza i pojęcia ogólne. */
+export function neuroVocabDecks() {
+  const general = GENERAL_TERMS.map(([en, pl]) => toCard(en.split("|"), pl, "Pojęcia ogólne"));
+  const boards = NEURO_BOARDS.map((b) => ({
+    id: b.id, title: b.titlePl, sub: b.title,
+    cards: b.items.map((it) => toCard(it.en, it.pl, "Plansza: " + b.titlePl)),
+  }));
+  // „Wszystkie" bez powtórek (np. pons jest na dwóch planszach).
+  const seen = new Set();
+  const all = [];
+  boards.flatMap((d) => d.cards).concat(general).forEach((c) => {
+    const k = normalizeAnswer(c.en);
+    if (seen.has(k)) return;
+    seen.add(k);
+    all.push(c);
+  });
+  return [
+    { id: "all", title: "Wszystkie słówka", sub: "Plansze + pojęcia ogólne", cards: all },
+    { id: "general", title: "Pojęcia ogólne", sub: "Neurony, neuroprzekaźniki, budowa mózgu", cards: general },
+    ...boards,
+  ];
+}
