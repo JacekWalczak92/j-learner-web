@@ -8,11 +8,11 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=17";
-import { JLDB as DB } from "./supabase.js?v=17";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks } from "./neuro.js?v=17";
+import { JLParsers as JLP } from "./parsers.js?v=18";
+import { JLDB as DB } from "./supabase.js?v=18";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=18";
 
-const APP_VERSION = "17";
+const APP_VERSION = "18";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -724,7 +724,9 @@ function showNeuroView(view) {
   $$(".neuro-view").forEach((b) => b.classList.toggle("is-active", b.dataset.view === view));
   $("#neuro-boards").classList.toggle("hidden", view !== "boards");
   $("#neuro-cards").classList.toggle("hidden", view !== "cards");
+  $("#neuro-fill").classList.toggle("hidden", view !== "fill");
   if (view === "cards") renderNeuroDecks();
+  else if (view === "fill") renderFillList();
   else renderNeuroList();
 }
 $$(".neuro-view").forEach((b) => b.addEventListener("click", () => showNeuroView(b.dataset.view)));
@@ -751,6 +753,181 @@ function openNeuroDeck(deck) {
   };
   renderReady();
   showScreen("screen-ready");
+}
+
+// ── Uzupełnianie zdań ────────────────────────────────────────────────────────
+function renderFillList() {
+  const ul = $("#neuro-fill-list");
+  ul.innerHTML = "";
+  const best = neuroBest();
+  FILL_SETS.forEach((set) => {
+    const count = set.sentences.reduce((n, t, i) => n + parseFillSentence(t, i).filter((p) => typeof p !== "string").length, 0);
+    const rec = best["fill:" + set.id];
+    const li = document.createElement("li");
+    li.appendChild(libCard({
+      kind: "file", icon: "✍", name: set.title,
+      sub: `${set.sub} · ${count} luk` + (rec ? ` · najlepszy wynik ${rec.ok}/${rec.total}` : ""),
+      onOpen: () => openFillSet(set),
+    }));
+    ul.appendChild(li);
+  });
+}
+
+function openFillSet(set) {
+  const f = state.fill = { set, blanks: [], answers: {}, results: {}, revealed: false, last: null };
+  $("#fill-title").textContent = set.title;
+  const ol = $("#fill-text");
+  ol.innerHTML = "";
+  set.sentences.forEach((text, sIdx) => {
+    const li = document.createElement("li");
+    li.className = "fill-sent";
+    parseFillSentence(text, sIdx).forEach((part) => {
+      if (typeof part === "string") return li.appendChild(document.createTextNode(part));
+      f.blanks.push({ ...part, sIdx });
+      const wrap = document.createElement("span");
+      wrap.className = "fill-blank";
+      wrap.dataset.id = part.id;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "fill-input";
+      input.autocomplete = "off";
+      input.spellcheck = false;
+      input.setAttribute("autocapitalize", "off");
+      input.lang = "en";
+      input.setAttribute("aria-label", "Luka");
+      input.style.width = Math.max(...part.en.map((x) => x.length), 6) + 4 + "ch";
+      input.addEventListener("focus", () => { f.last = part.id; });
+      input.addEventListener("input", () => { f.answers[part.id] = input.value; markUsedChips(); });
+      input.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        focusNextBlank(part.id);
+      });
+      const fix = document.createElement("span");
+      fix.className = "fill-fix";
+      wrap.append(input, fix);
+      li.appendChild(wrap);
+    });
+    ol.appendChild(li);
+  });
+  const bank = $("#fill-bank");
+  bank.innerHTML = "";
+  shuffled(set.bank).forEach((word) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "nb-chip";
+    chip.textContent = word;
+    chip.addEventListener("click", () => insertBankWord(word));
+    bank.appendChild(chip);
+  });
+  updateFillStats();
+  showScreen("screen-fill");
+  focusNextBlank(null);
+}
+
+function fillInput(id) { return $(`#fill-text .fill-blank[data-id="${id}"] input`); }
+
+/** Następna luka, która nie jest jeszcze dobra (po kolei, od bieżącej). */
+function focusNextBlank(fromId) {
+  const f = state.fill;
+  const start = fromId == null ? -1 : f.blanks.findIndex((b) => b.id === fromId);
+  for (let k = 1; k <= f.blanks.length; k++) {
+    const b = f.blanks[(start + k) % f.blanks.length];
+    if (f.results[b.id] !== "ok" && !(fromId != null && b.id === fromId)) {
+      const input = fillInput(b.id);
+      input.focus({ preventScroll: true });
+      input.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
+  }
+}
+
+function insertBankWord(word) {
+  const f = state.fill;
+  const target = f.last != null && f.results[f.last] !== "ok" ? f.last : (f.blanks.find((b) => f.results[b.id] !== "ok" && !f.answers[b.id]) || {}).id;
+  if (target == null) return;
+  const input = fillInput(target);
+  input.value = word;
+  f.answers[target] = word;
+  markUsedChips();
+  focusNextBlank(target);
+}
+
+// Słowa z banku już wpisane w jakąś lukę są wyszarzone (nadal można je kliknąć).
+function markUsedChips() {
+  const used = new Set(Object.values(state.fill.answers).map(normalizeAnswer).filter(Boolean));
+  $$("#fill-bank .nb-chip").forEach((c) => c.classList.toggle("is-used", used.has(normalizeAnswer(c.textContent))));
+}
+
+function setFillResult(b, res) {
+  const f = state.fill;
+  if (res) f.results[b.id] = res; else delete f.results[b.id];
+  const wrap = $(`#fill-text .fill-blank[data-id="${b.id}"]`);
+  ["ok", "typo", "bad"].forEach((c) => wrap.classList.toggle("is-" + c, res === c));
+  wrap.querySelector("input").readOnly = res === "ok";
+  wrap.querySelector(".fill-fix").textContent = res === "bad" || res === "typo" ? b.en[0] : "";
+}
+
+$("#btn-fill-check").addEventListener("click", () => {
+  const f = state.fill;
+  // Puste luki zostają neutralne — nie zdradzamy odpowiedzi, zanim ktoś spróbuje.
+  const todo = f.blanks.filter((b) => f.results[b.id] !== "ok" && normalizeAnswer(f.answers[b.id] || ""));
+  if (!todo.length) return showToast("Wpisz coś w luki, a potem sprawdź.");
+  const res = gradeFillBlanks(f.blanks, f.answers);
+  todo.forEach((b) => setFillResult(b, res[b.id]));
+  updateFillStats(true);
+});
+$("#btn-fill-retry").addEventListener("click", () => clearFill(true));
+$("#btn-fill-reset").addEventListener("click", () => clearFill(false));
+$("#btn-fill-reveal").addEventListener("click", () => {
+  const f = state.fill;
+  f.revealed = true;
+  f.blanks.forEach((b) => {
+    if (f.results[b.id] === "ok") return;
+    fillInput(b.id).value = b.en[0];
+    f.answers[b.id] = b.en[0];
+    setFillResult(b, "bad");
+  });
+  markUsedChips();
+  updateFillStats(true);
+});
+$("#btn-fill-quit").addEventListener("click", () => { showScreen("screen-library"); renderFillList(); });
+$("#fill-hide-bank").addEventListener("change", (e) => $("#fill-bank-box").classList.toggle("hidden", e.target.checked));
+
+function clearFill(onlyWrong) {
+  const f = state.fill;
+  if (!onlyWrong) f.revealed = false;
+  f.blanks.forEach((b) => {
+    if (onlyWrong && f.results[b.id] === "ok") return;
+    fillInput(b.id).value = "";
+    f.answers[b.id] = "";
+    setFillResult(b, null);
+  });
+  markUsedChips();
+  updateFillStats();
+  focusNextBlank(null);
+}
+
+function updateFillStats(checked = false) {
+  const { blanks, results, revealed, set } = state.fill;
+  const total = blanks.length;
+  const ok = blanks.filter((b) => results[b.id] === "ok").length;
+  const done = blanks.filter((b) => results[b.id]).length;
+  $("#fill-count").textContent = `${ok} / ${total}`;
+  $("#fill-score").textContent = `✓ ${ok}`;
+  $("#fill-progress").style.width = Math.round((ok / total) * 100) + "%";
+  const sum = $("#fill-summary");
+  if (!checked) { sum.classList.add("hidden"); return; }
+  sum.classList.remove("hidden");
+  if (done < total) {
+    sum.textContent = `Dobrze: ${ok}/${total}. Puste luki: ${total - done} — uzupełnij je i sprawdź jeszcze raz.`;
+    return;
+  }
+  if (revealed) { sum.textContent = "Odpowiedzi pokazane — „Od nowa”, żeby spróbować samodzielnie."; return; }
+  sum.textContent = ok === total
+    ? `Komplet! Wszystkie ${total} luk dobrze.`
+    : `Dobrze: ${ok}/${total}. Poprawne odpowiedzi są pod błędnymi lukami — „Popraw błędne” wyczyści tylko je.`;
+  saveNeuroBest("fill:" + set.id, ok, total);
 }
 
 function plStruct(n) {

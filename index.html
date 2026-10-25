@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="assets/styles.css?v=17" />
+  <link rel="stylesheet" href="assets/styles.css?v=18" />
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
@@ -131,11 +131,17 @@
         <div class="nb-modes" role="tablist" aria-label="Neuro EN">
           <button class="nb-mode neuro-view is-active" role="tab" type="button" data-view="boards">🧠 Plansze</button>
           <button class="nb-mode neuro-view" role="tab" type="button" data-view="cards">🃏 Fiszki</button>
+          <button class="nb-mode neuro-view" role="tab" type="button" data-view="fill">📝 Zdania</button>
         </div>
         <div id="neuro-boards">
           <p class="nb-intro">Angielskie nazwy struktur mózgu i neuronu. Na planszy wpisz nazwę dla każdego numeru —
             aplikacja sprawdzi odpowiedź (wielkość liter i spacje nie mają znaczenia) i pokaże poprawną.</p>
           <ul id="neuro-list" class="lib-list"></ul>
+        </div>
+        <div id="neuro-fill" class="hidden">
+          <p class="nb-intro">Uzupełnianie zdań: wpisz w luki brakujące angielskie słowa (albo klikaj słowa z banku).
+            „Sprawdź” pokaże, co jest dobrze, a „Popraw błędne” wyczyści tylko złe luki.</p>
+          <ul id="neuro-fill-list" class="lib-list"></ul>
         </div>
         <div id="neuro-cards" class="hidden">
           <p class="nb-intro">Fiszki ze słówkami: angielski z przodu, polski z tyłu. W opcjach przed startem
@@ -145,6 +151,35 @@
       </div>
 
       <p id="lib-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ───────────────────────── NEURO EN: UZUPEŁNIANIE ZDAŃ ───────────────────────── -->
+    <section id="screen-fill" class="screen">
+      <div class="session-bar">
+        <div class="progress-track"><div id="fill-progress" class="progress-fill"></div></div>
+        <div class="session-stats">
+          <span id="fill-count" class="stat">0 / 0</span>
+          <span id="fill-score" class="stat stat-ok">✓ 0</span>
+        </div>
+      </div>
+      <div class="nb-head">
+        <h1 id="fill-title" class="nb-title"></h1>
+        <label class="nb-toggle"><input id="fill-hide-bank" type="checkbox" /> Bez banku słów</label>
+      </div>
+      <div id="fill-bank-box" class="fill-bank-box">
+        <span class="nb-point-label">Bank słów — kliknij, żeby wstawić w zaznaczoną lukę:</span>
+        <div id="fill-bank" class="nb-bank"></div>
+      </div>
+      <ol id="fill-text" class="fill-text"></ol>
+      <p id="fill-summary" class="nb-summary hidden" role="status" aria-live="polite"></p>
+      <div class="session-controls">
+        <button id="btn-fill-check" class="btn btn-primary" type="button">Sprawdź</button>
+        <button id="btn-fill-retry" class="btn btn-secondary" type="button">Popraw błędne</button>
+        <button id="btn-fill-reveal" class="btn btn-ghost" type="button">Pokaż odpowiedzi</button>
+        <button id="btn-fill-reset" class="btn btn-ghost" type="button">Od nowa</button>
+      </div>
+      <p class="kbd-hint"><span class="kbd">Enter</span> następna luka &middot; dobrze wpisane luki robią się zielone i zostają zablokowane</p>
+      <div class="session-controls"><button id="btn-fill-quit" class="btn btn-link" type="button">Wróć do listy</button></div>
     </section>
 
     <!-- ───────────────────────── NEURO EN: PLANSZA ───────────────────────── -->
@@ -378,6 +413,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=17"></script>
+  <script type="module" src="assets/app.js?v=18"></script>
 </body>
 </html>

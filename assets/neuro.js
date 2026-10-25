@@ -493,3 +493,83 @@ export function neuroVocabDecks() {
     ...boards,
   ];
 }
+
+// ── Uzupełnianie zdań (arkusz „The Nervous System") ─────────────────────────
+// Luka: {odpowiedź|synonim|…}; „{@grupa:…}" = luki z tej samej grupy wolno wpisać
+// w dowolnej kolejności (np. hippocampus / amygdala).
+export const FILL_SETS = [
+  {
+    id: "ns-1-4",
+    title: "Układ nerwowy — zdania 1–4",
+    sub: "Neurony, PNS / CNS, somatyczny / autonomiczny",
+    bank: ["muscles", "the autonomic nervous system", "sensory neurons", "sympathetic nervous system", "motor neurons",
+      "peripheral nervous system (PNS)", "the somatic nervous system", "neurons", "parasympathetic nervous system",
+      "central nervous system (CNS)", "spinal cord"],
+    sentences: [
+      "{Neurons|neuron}, or nerve cells, are the basic units of the nervous system. {Sensory neurons|sensory neuron} carry sensory information from sensory receptors to the central nervous system. {Motor neurons|motor neuron} transmit commands from the brain to the glands and muscles of the body.",
+      "The {peripheral nervous system (PNS)|peripheral nervous system|PNS} consists of neurons that carry messages to and from the central nervous system. It has two subdivisions: {the somatic nervous system|somatic nervous system|somatic} and {the autonomic nervous system|autonomic nervous system|autonomic}. The first one consists of the sensory neurons that receive information through sensory receptors in the skin, muscles, and other parts of the body, such as eyes, and the motor neurons that direct the action of skeletal {muscles}. The second part controls basic life processes such as the beating of the heart, workings of the digestive system, and breathing. It consists of two parts, {sympathetic nervous system|sympathetic} (which is activated in response to threats) and {parasympathetic nervous system|parasympathetic} (which returns the body to normal and works to maintain the body’s energy resources).",
+      "The {central nervous system (CNS)|central nervous system|CNS} consists of the brain and the spinal cord. It is hierarchically organized, with an overall structure that follows its evolution.",
+      "Aside from carrying out reflexes, the {spinal cord} transmits sensory information to the brain and transmits messages from the brain to the muscles and organs.",
+    ],
+  },
+  {
+    id: "ns-5-9",
+    title: "Mózg — zdania 5–9",
+    sub: "Tyłomózgowie, układ limbiczny, kora, płaty",
+    bank: ["occipital lobes", "corpus callosum", "association areas", "thalamus", "medulla oblongata", "cerebellum",
+      "reticular formation", "frontal lobes", "lateralized", "temporal lobes", "hypothalamus", "cerebral cortex",
+      "primary areas", "hippocampus", "parietal lobes", "right and left hemispheres", "amygdala"],
+    sentences: [
+      "Several structures comprise the hindbrain. The {medulla oblongata|medulla} controls vital physiological functions, such as heartbeat, circulation, and respiration, and forms a link between the spinal cord and the rest of the brain. The {cerebellum} appears to be involved in a variety of tasks, including learning, discriminating stimuli from one another, and coordination of smooth movements. The {reticular formation} maintains consciousness and helps regulate activity and arousal states throughout the central nervous system, including sleep cycles.",
+      "The {hypothalamus} is involved in regulating a wide range of behaviors, including eating, sleeping, sexual activity and emotional experience. The {thalamus} is a complex of nuclei that perform a number of functions; one of the most important is to provide initial processing of sensory information and transmit this information to higher brain centers.",
+      "Structures of the limbic system (the septal area, {@limbic:hippocampus} and {@limbic:amygdala}) are involved in emotions, motivation, learning and memory.",
+      "In humans the {cerebral cortex|cortex} allows the flexible construction of sequences of voluntary movements, enables people to discriminate complex sensory patterns, and provides the capacity to think symbolically. The {primary areas} of cortex receive sensory information and initiate motor movements. The {association areas} are involved in putting together perceptions, ideas, and plans.",
+      "The {right and left hemispheres|left and right hemispheres|hemispheres} of the cerebral cortex are connected by the {corpus callosum}. Each hemisphere consists of four sections or lobes. The {occipital lobes|occipital lobe} are specialized for vision. The {parietal lobes|parietal lobe} are involved in a number of functions, including the sense of touch, movement, and the experience of one’s own body and other objects in space. The functions of the {frontal lobes|frontal lobe} include coordination of movement, attention, planning, social skills, conscience, abstract thinking, memory, and aspects of personality. Sections of {temporal lobes|temporal lobe} are important in hearing, language, and visual object recognition. Some psychological functions are {lateralized|lateralised}, or primarily processed by one hemisphere.",
+    ],
+  },
+];
+
+/** Zdanie → części: tekst (string) albo luka { id, en[], group }. */
+export function parseFillSentence(text, sIdx) {
+  const parts = [];
+  let k = 0;
+  text.split(/(\{[^}]+\})/).forEach((seg) => {
+    if (!seg) return;
+    const m = seg.match(/^\{(?:@([\w-]+):)?([^}]+)\}$/);
+    if (!m) return parts.push(seg);
+    parts.push({ id: `${sIdx}-${k++}`, group: m[1] || null, en: m[2].split("|").map((x) => x.trim()) });
+  });
+  return parts;
+}
+
+/**
+ * Ocena luk w zdaniu: { [id]: "ok" | "typo" | "bad" }.
+ * Luki z tej samej grupy przyjmują dowolną permutację swoich odpowiedzi.
+ */
+export function gradeFillBlanks(blanks, answers) {
+  const res = {};
+  const groups = new Map();
+  blanks.forEach((b) => {
+    if (b.group) {
+      if (!groups.has(b.group)) groups.set(b.group, []);
+      groups.get(b.group).push(b);
+    } else {
+      const r = gradeAnswer(answers[b.id] || "", b);
+      res[b.id] = r === "empty" ? "bad" : r;
+    }
+  });
+  groups.forEach((list) => {
+    const free = list.slice(); // odpowiedzi jeszcze nieprzypisane
+    list.forEach((b) => {
+      let best = "bad", bestIdx = -1;
+      free.forEach((target, i) => {
+        const r = gradeAnswer(answers[b.id] || "", target);
+        if (r === "ok" && best !== "ok") { best = "ok"; bestIdx = i; }
+        else if (r === "typo" && best === "bad") { best = "typo"; bestIdx = i; }
+      });
+      if (bestIdx >= 0) free.splice(bestIdx, 1);
+      res[b.id] = best;
+    });
+  });
+  return res;
+}

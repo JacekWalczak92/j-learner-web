@@ -45,6 +45,11 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
     wszystkie słówka (bez powtórek), osobno każda plansza i „Pojęcia ogólne” (neurony,
     potencjały, neuroprzekaźniki, istota szara/biała…). Działają na zwykłym silniku fiszek
     (Nauka / Przegląd, „Odwróć strony” = PL → EN); postęp nie jest zapisywany w bazie.
+  - **Zdania** (trzecia opcja przełącznika) — uzupełnianie luk w zdaniach z arkusza
+    „The Nervous System” (dwa zestawy: zdania 1–4 i 5–9, z bankiem słów). Wpisujesz albo
+    klikasz słowo z banku; „Sprawdź” ocenia tylko wypełnione luki, dobre się blokują, pod
+    złymi pojawia się poprawna odpowiedź. Opcja „Bez banku słów” dla trudniejszej wersji.
+    Nowe zestawy dodaje się w `FILL_SETS` (`assets/neuro.js`, luka = `{odpowiedź|synonim}`).
   Wszędzie: „Popraw błędne”, wymowa 🔊 (synteza mowy przeglądarki), opcjonalna podpowiedź
   po polsku. Nowe plansze dodaje się w `assets/neuro.js`; najlepsze wyniki zapisują się
   lokalnie w przeglądarce.
