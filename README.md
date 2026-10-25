@@ -27,13 +27,23 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   (odsłuch i pobieranie, bez usuwania). Wymaga uruchomienia aktualnego `supabase/schema.sql`
   (sekcja AUDIO) i dopisania swojego konta do `app_authors` (polecenie w komentarzu tam).
 - **Neuro EN** — nauka angielskich nazw struktur mózgu i neuronu (np. dla psychologów).
-  Plansze z ponumerowanymi strukturami (mózg — widok boczny, mózg — przekrój pośrodkowy,
-  neuron, synapsa chemiczna); wpisujesz angielską nazwę przy numerze, `Enter` sprawdza
-  i przechodzi dalej. Wielkość liter, spacje, myślniki i apostrofy nie mają znaczenia,
-  akceptowane są synonimy (np. *Sylvian fissure* = *lateral sulcus*), drobna literówka
-  jest oznaczana jako „prawie”. Opcjonalna podpowiedź po polsku, „Popraw błędne”,
-  „Pokaż odpowiedzi”. Rysunki to własne SVG w `assets/neuro.js` (tam też dodaje się
-  nowe plansze); najlepszy wynik zapisuje się lokalnie w przeglądarce.
+  Plansze (własne rysunki SVG): mózg — widok boczny, mózg — przekrój pośrodkowy
+  (z hipokampem, korą, pniem i rdzeniem), neuron, synapsa, typy neuronów (kształt i funkcja)
+  oraz podziały układu nerwowego (CNS/PNS, somatyczny/autonomiczny, współczulny/
+  przywspółczulny, aferentny/eferentny). Trzy tryby:
+  - **Wpisz nazwy** — wpisujesz nazwę przy numerze, `Enter` sprawdza; dobrze podpisane
+    znikają z listy, zostają coraz trudniejsze. Wielkość liter, spacje, myślniki i apostrofy
+    nie mają znaczenia, synonimy są akceptowane (np. *Sylvian fissure* = *lateral sulcus*),
+    drobna literówka = „prawie”.
+  - **Połącz nazwy** — pula nazw do połączenia z numerami na rysunku (nazwa → numer albo
+    numer → nazwa); dobrze połączone znikają.
+  - **Tłumacz** — EN → PL lub PL → EN, struktura podświetlona na rysunku.
+  - **Powtórka błędów** — karta na górze listy plansz: zbiera struktury pomylone w dowolnym
+    trybie na wszystkich planszach i pyta o nie w losowej kolejności (rysunek z podświetlonym
+    numerem, wpisujesz nazwę EN); dobra odpowiedź usuwa strukturę z powtórki.
+  Wszędzie: „Popraw błędne”, wymowa 🔊 (synteza mowy przeglądarki), opcjonalna podpowiedź
+  po polsku. Nowe plansze dodaje się w `assets/neuro.js`; najlepsze wyniki zapisują się
+  lokalnie w przeglądarce.
 - Skróty klawiszowe: ABCD `1`–`4`, `Enter`, `S`; oceny fiszek `Spacja`, `1`–`4`.
 - **Wyszukiwarka i sortowanie** w bibliotece (filtr po tytule, Nazwa A–Z / Ostatnio zmienione).
 - **Reset hasła** — link „Nie pamiętasz hasła?" wysyła e-mail; po kliknięciu w link

@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="assets/styles.css?v=15" />
+  <link rel="stylesheet" href="assets/styles.css?v=16" />
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
@@ -147,20 +147,56 @@
       </div>
       <div class="nb-head">
         <h1 id="nb-title" class="nb-title"></h1>
-        <label class="nb-toggle"><input id="nb-hints" type="checkbox" /> Podpowiedź po polsku</label>
+        <label id="nb-hints-wrap" class="nb-toggle"><input id="nb-hints" type="checkbox" /> Podpowiedź po polsku</label>
+      </div>
+      <div id="nb-modes" class="nb-modes" role="tablist" aria-label="Tryb planszy">
+        <button class="nb-mode is-active" role="tab" type="button" data-mode="type">✎ Wpisz nazwy</button>
+        <button class="nb-mode" role="tab" type="button" data-mode="match">⇄ Połącz nazwy</button>
+        <button class="nb-mode" role="tab" type="button" data-mode="trans">🌐 Tłumacz</button>
       </div>
       <div class="nb-layout">
         <div id="nb-figure" class="nb-figure"></div>
-        <ol id="nb-inputs" class="nb-inputs"></ol>
+        <div class="nb-side">
+          <div id="nb-point" class="nb-point hidden">
+            <span class="nb-point-label">Wybierz nazwę, a potem kliknij jej numer na rysunku (albo odwrotnie).</span>
+            <div class="nb-point-term">
+              <span id="nb-point-term">—</span>
+              <button id="btn-nb-say" class="nb-say hidden" type="button" title="Wymowa" aria-label="Posłuchaj wymowy">🔊</button>
+            </div>
+            <span id="nb-point-pl" class="nb-hint hidden"></span>
+            <span id="nb-point-fb" class="nb-point-fb" aria-live="polite"></span>
+            <div id="nb-bank" class="nb-bank"></div>
+          </div>
+          <div id="nb-trans" class="nb-point hidden">
+            <div id="nb-dir" class="nb-dir" role="group" aria-label="Kierunek tłumaczenia">
+              <button class="nb-chip is-sel" type="button" data-dir="en-pl">EN → PL</button>
+              <button class="nb-chip" type="button" data-dir="pl-en">PL → EN</button>
+            </div>
+            <span id="nb-trans-label" class="nb-point-label">Przetłumacz na polski:</span>
+            <div class="nb-point-term">
+              <span id="nb-trans-term"></span>
+              <button id="btn-nb-trans-say" class="nb-say" type="button" title="Wymowa" aria-label="Posłuchaj wymowy">🔊</button>
+            </div>
+            <input id="nb-trans-input" class="text-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Tłumaczenie" />
+            <span id="nb-trans-fb" class="nb-point-fb" aria-live="polite"></span>
+            <div class="nb-trans-actions">
+              <button id="btn-nb-trans-check" class="btn btn-primary btn-sm" type="button">Sprawdź</button>
+              <button id="btn-nb-trans-next" class="btn btn-secondary btn-sm hidden" type="button">Dalej →</button>
+            </div>
+          </div>
+          <ol id="nb-inputs" class="nb-inputs"></ol>
+        </div>
       </div>
       <p id="nb-summary" class="nb-summary hidden" role="status" aria-live="polite"></p>
       <div class="session-controls">
-        <button id="btn-nb-check" class="btn btn-primary" type="button">Sprawdź wszystko</button>
+        <button id="btn-nb-check" class="btn btn-primary nb-type-only" type="button">Sprawdź wszystko</button>
         <button id="btn-nb-retry" class="btn btn-secondary" type="button">Popraw błędne</button>
-        <button id="btn-nb-reveal" class="btn btn-ghost" type="button">Pokaż odpowiedzi</button>
+        <button id="btn-nb-reveal" class="btn btn-ghost nb-type-only" type="button">Pokaż odpowiedzi</button>
         <button id="btn-nb-reset" class="btn btn-ghost" type="button">Od nowa</button>
       </div>
-      <p class="kbd-hint"><span class="kbd">Enter</span> sprawdź i dalej &middot; kliknij numer na rysunku, aby przejść do pola</p>
+      <p class="kbd-hint nb-type-only"><span class="kbd">Enter</span> sprawdź i dalej &middot; dobrze podpisane znikają z listy &middot; 🔊 wymowa po sprawdzeniu</p>
+      <p class="kbd-hint nb-point-only hidden">Dobrze połączone nazwy znikają &middot; pomylone wracają w „Popraw błędne”</p>
+      <p class="kbd-hint nb-trans-only hidden"><span class="kbd">Enter</span> sprawdź, drugi <span class="kbd">Enter</span> dalej &middot; struktura jest podświetlona na rysunku</p>
       <div class="session-controls"><button id="btn-nb-quit" class="btn btn-link" type="button">Wróć do listy plansz</button></div>
     </section>
 
@@ -331,6 +367,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=15"></script>
+  <script type="module" src="assets/app.js?v=16"></script>
 </body>
 </html>
