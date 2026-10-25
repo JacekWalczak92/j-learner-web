@@ -37,7 +37,7 @@ Edge Function `publish-material`).
 | `assets/app.js` (~1700 linii) | Cała logika UI: logowanie/rejestracja/reset hasła, biblioteka (foldery, kategorie, wyszukiwarka, sortowanie), modale, edytor, ekran startu sesji, silniki trybów nauki, zapis postępu, wyniki. |
 | `assets/supabase.js` | Warstwa danych, eksportuje `JLDB`: sesja (localStorage + odświeżanie tokenu), `rest()`, foldery, materiały, postęp. |
 | `assets/parsers.js` | Eksportuje `JLParsers`: `parseTestText`, `parseFlashcardText`, `detectMaterialType` itd. |
-| `assets/neuro.js` | Eksportuje `NEURO_BOARDS` (plansze „Neuro EN": własne SVG, elementy `{ n, en[], pl, x, y, lx, ly }`), `boardSvgMarkup`, `gradeAnswer` (EN lub PL przez `plAnswers`). UI w `app.js` (sekcja NEURO EN): tryby `type` / `match` / `trans`; najlepsze wyniki w localStorage `jl_neuro_best` (klucze `id`, `id:match`, `id:trans`). |
+| `assets/neuro.js` | Eksportuje `NEURO_BOARDS` (plansze „Neuro EN": własne SVG, elementy `{ n, en[], pl, x, y, lx, ly }`), `boardSvgMarkup`, `gradeAnswer` (EN lub PL przez `plAnswers`). UI w `app.js` (sekcja NEURO EN): tryby `type` / `match` / `trans`; najlepsze wyniki w localStorage `jl_neuro_best` (klucze `id`, `id:match`, `id:trans`); błędy do „Powtórki błędów” w `jl_neuro_mistakes` (`boardId:n`). |
 | `assets/config.js` | `JL_CONFIG` = `{ supabaseUrl, supabaseAnonKey }`. |
 | `assets/styles.css` | Cały wygląd (~1600 linii). |
 | `sw.js` | Service worker: cache shellu (cache-first dla zasobów z `?v=`). |

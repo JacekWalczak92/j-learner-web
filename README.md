@@ -38,6 +38,9 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   - **Połącz nazwy** — pula nazw do połączenia z numerami na rysunku (nazwa → numer albo
     numer → nazwa); dobrze połączone znikają.
   - **Tłumacz** — EN → PL lub PL → EN, struktura podświetlona na rysunku.
+  - **Powtórka błędów** — karta na górze listy plansz: zbiera struktury pomylone w dowolnym
+    trybie na wszystkich planszach i pyta o nie w losowej kolejności (rysunek z podświetlonym
+    numerem, wpisujesz nazwę EN); dobra odpowiedź usuwa strukturę z powtórki.
   Wszędzie: „Popraw błędne”, wymowa 🔊 (synteza mowy przeglądarki), opcjonalna podpowiedź
   po polsku. Nowe plansze dodaje się w `assets/neuro.js`; najlepsze wyniki zapisują się
   lokalnie w przeglądarce.

@@ -694,10 +694,49 @@ function saveNeuroBest(id, ok, total) {
   try { localStorage.setItem(NEURO_BEST_KEY, JSON.stringify(all)); } catch (_) { /* tryb prywatny */ }
 }
 
+// Błędy ze wszystkich plansz (do „Powtórki błędów"): { "boardId:n": liczba pomyłek }.
+const NEURO_MISTAKES_KEY = "jl_neuro_mistakes";
+function neuroMistakes() {
+  try { return JSON.parse(localStorage.getItem(NEURO_MISTAKES_KEY) || "{}") || {}; } catch (_) { return {}; }
+}
+function markNeuroMistake(boardId, n, wrong) {
+  const all = neuroMistakes();
+  const key = boardId + ":" + n;
+  if (wrong) all[key] = (all[key] || 0) + 1;
+  else if (key in all) delete all[key];
+  else return;
+  try { localStorage.setItem(NEURO_MISTAKES_KEY, JSON.stringify(all)); } catch (_) { /* tryb prywatny */ }
+}
+/** Lista { board, item } z zapisanych błędów (pomija elementy, których już nie ma). */
+function neuroMistakeItems() {
+  return Object.keys(neuroMistakes()).map((key) => {
+    const i = key.lastIndexOf(":");
+    const board = boardById(key.slice(0, i));
+    const item = board && board.items.find((it) => it.n === Number(key.slice(i + 1)));
+    return item ? { board, item } : null;
+  }).filter(Boolean);
+}
+
+function plStruct(n) {
+  if (n === 1) return "struktura";
+  const d = n % 10, dd = n % 100;
+  return d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? "struktury" : "struktur";
+}
+
 function renderNeuroList() {
   const ul = $("#neuro-list");
   ul.innerHTML = "";
   const best = neuroBest();
+  const mistakes = neuroMistakeItems();
+  if (mistakes.length) {
+    const li = document.createElement("li");
+    li.appendChild(libCard({
+      kind: "folder", icon: "↺", name: "Powtórka błędów",
+      sub: `${mistakes.length} ${plStruct(mistakes.length)} z różnych plansz — wpisz angielską nazwę`,
+      onOpen: startNeuroReview,
+    }));
+    ul.appendChild(li);
+  }
   NEURO_BOARDS.forEach((b) => {
     const rec = best[b.id], recMatch = best[b.id + ":match"], recTrans = best[b.id + ":trans"];
     const li = document.createElement("li");
@@ -746,6 +785,9 @@ function openNeuroBoard(id, mode = state.neuro.mode || "type") {
   $("#nb-trans").classList.toggle("hidden", !trans);
   $("#nb-inputs").classList.toggle("hidden", mode !== "type");
   $("#nb-hints-wrap").classList.toggle("hidden", trans);
+  $("#nb-modes").classList.remove("hidden");
+  $("#nb-dir").classList.remove("hidden");
+  $("#btn-nb-retry").classList.remove("hidden");
 
   const ol = $("#nb-inputs");
   ol.innerHTML = "";
@@ -812,6 +854,7 @@ function focusNextNeuro(fromN) {
 
 function setNeuroResult(it, res) {
   state.neuro.results[it.n] = res;
+  if (res) markNeuroMistake(state.neuro.board.id, it.n, res !== "ok");
   const row = neuroRow(it.n);
   const mark = $(`#nb-figure .nb-mark[data-n="${it.n}"]`);
   ["ok", "typo", "bad"].forEach((c) => {
@@ -898,7 +941,8 @@ $("#btn-nb-retry").addEventListener("click", () => {
   else startNeuroMatch(wrong);
 });
 $("#btn-nb-reset").addEventListener("click", () => {
-  if (state.neuro.mode === "match") startNeuroMatch(state.neuro.board.items);
+  if (state.neuro.review) startNeuroReview();
+  else if (state.neuro.mode === "match") startNeuroMatch(state.neuro.board.items);
   else if (state.neuro.mode === "trans") startNeuroTrans(state.neuro.board.items);
   else clearNeuro(false);
 });
@@ -981,7 +1025,7 @@ function tryNeuroMatch(chipN, markN) {
   nb.sel = null;
   nb.selMark = null;
   if (chipN === markN) {
-    if (!nb.results[chipN]) nb.results[chipN] = "ok";
+    if (!nb.results[chipN]) { nb.results[chipN] = "ok"; markNeuroMistake(nb.board.id, chipN, false); }
     nb.matched.add(chipN);
     const mark = $(`#nb-figure .nb-mark[data-n="${chipN}"]`);
     mark.classList.add(nb.results[chipN] === "ok" ? "is-ok" : "is-typo");
@@ -992,6 +1036,7 @@ function tryNeuroMatch(chipN, markN) {
   }
   // Pomyłka liczy się dla nazwy, którą próbowano dopasować.
   nb.results[chipN] = "bad";
+  markNeuroMistake(nb.board.id, chipN, true);
   const chip = $(`#nb-bank .nb-chip[data-n="${chipN}"]`);
   const miss = $(`#nb-figure .nb-mark[data-n="${markN}"]`);
   if (chip) chip.classList.add("is-wrong");
@@ -1047,6 +1092,7 @@ function showNeuroTrans() {
 
 function checkNeuroTrans() {
   const nb = state.neuro;
+  if (nb.review) return checkNeuroReview();
   const it = nb.queue[nb.idx];
   if (!it) return;
   if (nb.checked) { nb.idx++; return showNeuroTrans(); }
@@ -1054,6 +1100,7 @@ function checkNeuroTrans() {
   const res = gradeAnswer($("#nb-trans-input").value, it, toPl ? "pl" : "en");
   const r = res === "empty" ? "bad" : res;
   nb.results[it.n] = r;
+  markNeuroMistake(nb.board.id, it.n, r !== "ok");
   nb.checked = true;
   const mark = $(`#nb-figure .nb-mark[data-n="${it.n}"]`);
   if (mark) mark.classList.add("is-" + r);
@@ -1093,9 +1140,98 @@ $("#nb-trans-input").addEventListener("keydown", (e) => {
   checkNeuroTrans();
 });
 $("#btn-nb-trans-say").addEventListener("click", () => {
-  const it = state.neuro.queue[state.neuro.idx];
+  const q = state.neuro.queue[state.neuro.idx];
+  const it = state.neuro.review ? q && q.item : q;
   if (it) sayEn(it.en[0]);
 });
+
+// ── Powtórka błędów: struktury pomylone na dowolnej planszy, w losowej kolejności ──
+function startNeuroReview() {
+  const list = neuroMistakeItems();
+  if (!list.length) { showToast("Nie masz zapisanych błędów — świetnie!", "ok"); return renderNeuroList(); }
+  state.neuro = { board: null, mode: state.neuro.mode || "type", review: true, results: {}, answers: {}, queue: shuffled(list), idx: 0, ok: 0, checked: false, busy: false };
+  $("#nb-title").textContent = "Powtórka błędów";
+  $("#nb-modes").classList.add("hidden");
+  $("#nb-dir").classList.add("hidden");
+  $("#nb-hints-wrap").classList.add("hidden");
+  $("#nb-inputs").classList.add("hidden");
+  $("#nb-point").classList.add("hidden");
+  $("#nb-trans").classList.remove("hidden");
+  $$(".nb-type-only, .nb-point-only").forEach((el) => el.classList.add("hidden"));
+  $$(".nb-trans-only").forEach((el) => el.classList.remove("hidden"));
+  $("#btn-nb-retry").classList.add("hidden");
+  showNeuroReview();
+  showScreen("screen-neuro");
+}
+
+function showNeuroReview() {
+  const nb = state.neuro;
+  const q = nb.queue[nb.idx];
+  const input = $("#nb-trans-input");
+  nb.checked = false;
+  input.value = "";
+  input.disabled = !q;
+  input.lang = "en";
+  input.placeholder = "in English…";
+  $("#nb-trans-fb").textContent = "";
+  $("#nb-trans-fb").className = "nb-point-fb";
+  $("#btn-nb-trans-check").classList.toggle("hidden", !q);
+  $("#btn-nb-trans-next").classList.add("hidden");
+  $("#btn-nb-trans-say").classList.add("hidden");
+  if (q) {
+    // Rysunek planszy, z której pochodzi błąd; pytamy o podświetlony numer.
+    if (nb.board !== q.board) {
+      nb.board = q.board;
+      $("#nb-figure").innerHTML = boardSvgMarkup(q.board);
+    }
+    $$("#nb-figure .nb-mark").forEach((g) => g.classList.remove("is-ok", "is-bad", "is-typo"));
+    highlightNeuroMark(q.item.n);
+    $("#nb-trans-label").textContent = `${q.board.titlePl} · nr ${q.item.n} — po angielsku:`;
+    $("#nb-trans-term").textContent = q.item.pl;
+  } else {
+    $("#nb-trans-label").textContent = "";
+    $("#nb-trans-term").textContent = "Koniec powtórki";
+    highlightNeuroMark(0);
+  }
+  updateReviewStats();
+  if (q) input.focus({ preventScroll: true });
+}
+
+function checkNeuroReview() {
+  const nb = state.neuro;
+  const q = nb.queue[nb.idx];
+  if (!q) return;
+  if (nb.checked) { nb.idx++; return showNeuroReview(); }
+  const res = gradeAnswer($("#nb-trans-input").value, q.item);
+  const r = res === "empty" ? "bad" : res;
+  nb.checked = true;
+  if (r === "ok") nb.ok++;
+  markNeuroMistake(q.board.id, q.item.n, r !== "ok"); // dobrze = znika z powtórki
+  const mark = $(`#nb-figure .nb-mark[data-n="${q.item.n}"]`);
+  if (mark) mark.classList.add("is-" + r);
+  const fb = $("#nb-trans-fb");
+  fb.textContent = r === "ok" ? "✓ Dobrze — znika z powtórki" : (r === "typo" ? "≈ Prawie — pisownia: " : "✕ Poprawnie: ") + q.item.en[0];
+  fb.className = "nb-point-fb " + (r === "ok" ? "ok" : r === "typo" ? "typo" : "bad");
+  $("#btn-nb-trans-say").classList.remove("hidden");
+  $("#btn-nb-trans-check").classList.add("hidden");
+  $("#btn-nb-trans-next").classList.remove("hidden");
+  updateReviewStats();
+}
+
+function updateReviewStats() {
+  const { queue, idx, ok, checked } = state.neuro;
+  const done = Math.min(queue.length, idx + (checked ? 1 : 0));
+  $("#nb-count").textContent = `${done} / ${queue.length}`;
+  $("#nb-score").textContent = `✓ ${ok}`;
+  $("#nb-progress").style.width = Math.round((done / Math.max(1, queue.length)) * 100) + "%";
+  const sum = $("#nb-summary");
+  if (done < queue.length) { sum.classList.add("hidden"); return; }
+  const left = neuroMistakeItems().length;
+  sum.classList.remove("hidden");
+  sum.textContent = left
+    ? `Poprawione: ${ok}/${queue.length}. Zostało ${left} do powtórki — „Od nowa” zaczyna kolejną rundę.`
+    : `Wszystkie błędy poprawione — powtórka jest pusta!`;
+}
 $$("#nb-trans .nb-dir .nb-chip").forEach((c) => c.addEventListener("click", () => {
   if (c.dataset.dir === neuroTransDir) return;
   neuroTransDir = c.dataset.dir;
