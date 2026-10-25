@@ -14,7 +14,7 @@
 //  UWAGA przy wydaniu nowej wersji: podbij VERSION razem z ?v= w index.html.
 // ============================================================================
 
-const VERSION = "14";
+const VERSION = "15";
 const CACHE_NAME = "jl-shell-v" + VERSION;
 
 const SHELL = [
@@ -25,6 +25,7 @@ const SHELL = [
   "./assets/app.js?v=" + VERSION,
   "./assets/parsers.js?v=" + VERSION,
   "./assets/supabase.js?v=" + VERSION,
+  "./assets/neuro.js?v=" + VERSION,
   "./assets/config.js?v=" + VERSION,
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",

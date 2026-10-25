@@ -26,6 +26,14 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   konta autora (tabela `app_authors`) widzą wszyscy zalogowani w sekcjach „Od autora · …”
   (odsłuch i pobieranie, bez usuwania). Wymaga uruchomienia aktualnego `supabase/schema.sql`
   (sekcja AUDIO) i dopisania swojego konta do `app_authors` (polecenie w komentarzu tam).
+- **Neuro EN** — nauka angielskich nazw struktur mózgu i neuronu (np. dla psychologów).
+  Plansze z ponumerowanymi strukturami (mózg — widok boczny, mózg — przekrój pośrodkowy,
+  neuron, synapsa chemiczna); wpisujesz angielską nazwę przy numerze, `Enter` sprawdza
+  i przechodzi dalej. Wielkość liter, spacje, myślniki i apostrofy nie mają znaczenia,
+  akceptowane są synonimy (np. *Sylvian fissure* = *lateral sulcus*), drobna literówka
+  jest oznaczana jako „prawie”. Opcjonalna podpowiedź po polsku, „Popraw błędne”,
+  „Pokaż odpowiedzi”. Rysunki to własne SVG w `assets/neuro.js` (tam też dodaje się
+  nowe plansze); najlepszy wynik zapisuje się lokalnie w przeglądarce.
 - Skróty klawiszowe: ABCD `1`–`4`, `Enter`, `S`; oceny fiszek `Spacja`, `1`–`4`.
 - **Wyszukiwarka i sortowanie** w bibliotece (filtr po tytule, Nazwa A–Z / Ostatnio zmienione).
 - **Reset hasła** — link „Nie pamiętasz hasła?" wysyła e-mail; po kliknięciu w link
@@ -80,7 +88,7 @@ Frontend to moduły ES z cache-bustingiem `?v=N` oraz service worker z własną 
 Przy każdym wydaniu podbij numer wersji w **czterech** miejscach:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
-2. `assets/app.js` — `?v=N` w importach `parsers.js` i `supabase.js` (i stała `APP_VERSION`),
+2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js` i `neuro.js` (i stała `APP_VERSION`),
 3. `assets/supabase.js` — `?v=N` w imporcie `config.js`,
 4. `sw.js` — stała `VERSION` (zmienia nazwę cache i wymusza odświeżenie shellu).
 
@@ -127,6 +135,7 @@ j-learner-web/
 │   ├── config.js       # ⚙️ dane Supabase (URL + anon key)
 │   ├── supabase.js     # warstwa danych: konta + foldery + materiały
 │   ├── parsers.js      # parsowanie formatów (test/fiszki)
+│   ├── neuro.js        # plansze „Neuro EN" (SVG + nazwy + sprawdzanie)
 │   ├── styles.css      # wygląd
 │   └── app.js          # logika UI i sesji
 ├── supabase/
