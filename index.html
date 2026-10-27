@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="assets/styles.css?v=18" />
+  <link rel="stylesheet" href="assets/styles.css?v=19" />
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
@@ -69,6 +69,7 @@
         <button class="source-tab" role="tab" data-tab="public">Od autora</button>
         <button class="source-tab" role="tab" data-tab="audio">Audio</button>
         <button class="source-tab" role="tab" data-tab="neuro">Neuro EN</button>
+        <button class="source-tab" role="tab" data-tab="stats"><span class="tab-long">Statystyka</span><span class="tab-short">Stat</span></button>
       </div>
 
       <div id="tab-mine">
@@ -150,7 +151,46 @@
         </div>
       </div>
 
+      <div id="tab-stats" class="hidden">
+        <p class="nb-intro">Zadania do wykładów 1–2 ze statystyki. Liczby są losowane za każdym razem, więc trzeba umieć
+          metodę, a nie zapamiętać wynik. Dobrze rozwiązane zadanie znika; błędne wraca za chwilę z nowymi danymi.</p>
+        <ul id="stats-list" class="lib-list"></ul>
+      </div>
+
       <p id="lib-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ───────────────────────── STATYSTYKA: ZADANIA ───────────────────────── -->
+    <section id="screen-stats" class="screen">
+      <div class="session-bar">
+        <div class="progress-track"><div id="st-progress" class="progress-fill"></div></div>
+        <div class="session-stats">
+          <span id="st-count" class="stat">0</span>
+          <span id="st-score" class="stat stat-ok">✓ 0</span>
+        </div>
+      </div>
+      <div class="nb-head">
+        <h1 id="st-title" class="nb-title"></h1>
+        <span id="st-kind" class="st-kind"></span>
+      </div>
+      <div id="st-card" class="qcard st-card">
+        <div id="st-q" class="st-q"></div>
+        <div id="st-fig" class="st-fig hidden"></div>
+        <div id="st-fields" class="st-fields"></div>
+        <div id="st-choices" class="answers"></div>
+        <div id="st-hint" class="st-hint hidden"></div>
+        <div id="st-fb" class="st-fb hidden" role="status" aria-live="polite"></div>
+      </div>
+      <div id="st-end" class="nb-summary st-end hidden"></div>
+      <div id="st-controls" class="session-controls">
+        <button id="btn-st-hint" class="btn btn-ghost" type="button">💡 Podpowiedź</button>
+        <button id="btn-st-giveup" class="btn btn-ghost" type="button">Nie wiem</button>
+        <button id="btn-st-check" class="btn btn-primary" type="button">Sprawdź</button>
+        <button id="btn-st-next" class="btn btn-primary hidden" type="button">Dalej</button>
+      </div>
+      <p class="kbd-hint"><span class="kbd">Enter</span> sprawdź / dalej &middot; <span class="kbd">1</span>–<span class="kbd">4</span> wybór &middot;
+        liczby z przecinkiem lub kropką &middot; błędne zadania wracają z nowymi liczbami</p>
+      <div class="session-controls"><button id="btn-st-quit" class="btn btn-link" type="button">Wróć do tematów</button></div>
     </section>
 
     <!-- ───────────────────────── NEURO EN: UZUPEŁNIANIE ZDAŃ ───────────────────────── -->
@@ -413,6 +453,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=18"></script>
+  <script type="module" src="assets/app.js?v=19"></script>
 </body>
 </html>

@@ -8,11 +8,12 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=18";
-import { JLDB as DB } from "./supabase.js?v=18";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=18";
+import { JLParsers as JLP } from "./parsers.js?v=19";
+import { JLDB as DB } from "./supabase.js?v=19";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=19";
+import { STAT_TOPICS, STAT_EXAM_SIZE, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=19";
 
-const APP_VERSION = "18";
+const APP_VERSION = "19";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -272,10 +273,12 @@ function switchTab(tab) {
   $("#tab-public").classList.toggle("hidden", tab !== "public");
   $("#tab-audio").classList.toggle("hidden", tab !== "audio");
   $("#tab-neuro").classList.toggle("hidden", tab !== "neuro");
+  $("#tab-stats").classList.toggle("hidden", tab !== "stats");
   setLibStatus("");
   if (tab === "mine") loadMy();
   else if (tab === "audio") loadAudio();
   else if (tab === "neuro") showNeuroView(neuroView);
+  else if (tab === "stats") renderStatsList();
   else loadPublic();
 }
 $$('.source-tab[data-tab]').forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
@@ -1470,6 +1473,243 @@ function updateMatchStats() {
 }
 
 $("#btn-nb-quit").addEventListener("click", () => { showScreen("screen-library"); renderNeuroList(); });
+
+// ════════════════════════════════════════════════════════════════════════════
+//  STATYSTYKA — zadania z losowanymi danymi (stats.js); dobrze rozwiązane znikają
+// ════════════════════════════════════════════════════════════════════════════
+// Tylko lokalnie: najlepsze wyniki „za pierwszym razem" i typy zadań z błędami.
+const STATS_BEST_KEY = "jl_stats_best";         // { topicId | "exam": { ok, total } }
+const STATS_MISTAKES_KEY = "jl_stats_mistakes"; // { genId: liczba pomyłek }
+function readLocal(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "{}") || {}; } catch (_) { return {}; }
+}
+function writeLocal(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (_) { /* tryb prywatny */ }
+}
+function markStatsMistake(genId, wrong) {
+  const all = readLocal(STATS_MISTAKES_KEY);
+  if (wrong) all[genId] = (all[genId] || 0) + 1;
+  else if (genId in all) delete all[genId];
+  else return;
+  writeLocal(STATS_MISTAKES_KEY, all);
+}
+function plTask(n) { return plural(n, "zadanie", "zadania", "zadań"); }
+
+function renderStatsList() {
+  const ul = $("#stats-list");
+  ul.innerHTML = "";
+  const best = readLocal(STATS_BEST_KEY);
+  const rec = (id) => (best[id] ? ` · najlepiej ${best[id].ok}/${best[id].total} za 1. razem` : "");
+  const add = (o) => { const li = document.createElement("li"); li.appendChild(libCard(o)); ul.appendChild(li); };
+  const missed = Object.keys(readLocal(STATS_MISTAKES_KEY)).map(genById).filter(Boolean);
+  if (missed.length) {
+    add({ kind: "folder", icon: "↺", name: "Powtórka błędów",
+      sub: `${missed.length} ${plural(missed.length, "typ", "typy", "typów")} zadań, w których był błąd — z nowymi liczbami`,
+      onOpen: () => startStats("review", "Powtórka błędów", missed) });
+  }
+  add({ kind: "folder", icon: "★", name: "Test mieszany",
+    sub: `${STAT_EXAM_SIZE} losowych zadań ze wszystkich tematów` + rec("exam"),
+    onOpen: () => startStats("exam", "Test mieszany", examGens()) });
+  STAT_TOPICS.forEach((t) => add({
+    kind: "file", icon: t.icon, name: t.title,
+    sub: `${t.sub} · ${t.gens.length} ${plTask(t.gens.length)}` + rec(t.id),
+    onOpen: () => startStats(t.id, t.title, t.gens),
+  }));
+}
+
+function startStats(id, title, gens) {
+  const used = new Set(); // pytania z banku już zadane w tej sesji
+  state.stats = {
+    id, title, gens, used, total: gens.length, done: 0, firstOk: 0, missed: new Map(),
+    queue: gens.map((gen) => ({ gen, inst: gen.make(used), tries: 0 })),
+    phase: "answer", sel: null, hinted: false,
+  };
+  $("#st-title").textContent = title;
+  showScreen("screen-stats");
+  showStatsTask();
+}
+
+function statInput(i) { return $(`#st-fields .st-field[data-i="${i}"] input`); }
+
+function showStatsTask() {
+  const s = state.stats;
+  updateStatsBar();
+  if (!s.queue.length) return finishStats();
+  const item = s.queue[0], t = item.inst;
+  Object.assign(s, { phase: "answer", sel: null, hinted: false });
+  $("#st-card").classList.remove("hidden");
+  $("#st-end").classList.add("hidden");
+  $("#st-kind").textContent = item.gen.title + (item.tries ? " · nowe liczby" : "");
+  $("#st-q").innerHTML = t.q;
+  $("#st-fig").innerHTML = t.fig || "";
+  $("#st-fig").classList.toggle("hidden", !t.fig);
+
+  const fields = $("#st-fields");
+  fields.innerHTML = "";
+  (t.fields || []).forEach((f, i) => {
+    const row = document.createElement("label");
+    row.className = "st-field";
+    row.dataset.i = String(i);
+    row.innerHTML = `<span class="st-field-label">${f.label}</span>` +
+      `<input class="text-input st-input" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" />` +
+      `<span class="st-fix"></span>`;
+    row.querySelector("input").addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      e.stopPropagation();
+      const next = statInput(i + 1);
+      if (next && state.stats.phase === "answer" && !next.value) next.focus();
+      else if (state.stats.phase === "answer") checkStats();
+      else nextStats();
+    });
+    fields.appendChild(row);
+  });
+
+  const box = $("#st-choices");
+  box.innerHTML = "";
+  (t.choices || []).forEach((html, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "answer";
+    b.innerHTML = `<span class="answer-key">${i + 1}</span><span>${html}</span>`;
+    b.addEventListener("click", () => pickStatsChoice(i));
+    box.appendChild(b);
+  });
+
+  $("#st-card").classList.toggle("choices-first", !!(t.fields && t.choices));
+  $("#st-hint").classList.add("hidden");
+  $("#st-fb").classList.add("hidden");
+  $("#btn-st-hint").disabled = false;
+  ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check"].forEach((sel) => $(sel).classList.remove("hidden"));
+  $("#btn-st-check").classList.toggle("hidden", !t.fields);
+  $("#btn-st-next").classList.add("hidden");
+  window.scrollTo({ top: 0 });
+  if (t.fields && matchMedia("(hover: hover)").matches) statInput(0).focus({ preventScroll: true });
+}
+
+/** Wybór odpowiedzi: przy samym wyborze od razu sprawdzamy, przy wyborze + polach czekamy na „Sprawdź". */
+function pickStatsChoice(i) {
+  const s = state.stats;
+  if (s.phase !== "answer") return;
+  s.sel = i;
+  $$("#st-choices .answer").forEach((b, k) => b.classList.toggle("selected", k === i));
+  if (!s.queue[0].inst.fields) checkStats();
+}
+
+function checkStats(giveUp = false) {
+  const s = state.stats;
+  if (s.phase !== "answer") return;
+  const item = s.queue[0], t = item.inst;
+  const vals = (t.fields || []).map((_, i) => parseNum(statInput(i).value));
+  if (!giveUp) {
+    if (t.choices && s.sel == null) return showToast("Wybierz odpowiedź.");
+    if (vals.some((v) => Number.isNaN(v))) return showToast("Wpisz liczbę w każde pole (przecinek albo kropka).");
+  }
+  let allOk = true;
+  const notes = [];
+  (t.fields || []).forEach((f, i) => {
+    const ok = !giveUp && numClose(vals[i], f.ans, f.d);
+    const row = $(`#st-fields .st-field[data-i="${i}"]`);
+    row.classList.add(ok ? "is-ok" : "is-bad");
+    row.querySelector("input").readOnly = true;
+    row.querySelector(".st-fix").textContent = ok ? "" : "= " + fmt(f.ans, f.d);
+    if (ok) return;
+    allOk = false;
+    const trap = !giveUp && (f.traps || []).find(([v]) => numClose(vals[i], v, f.d));
+    if (trap) notes.push(trap[1]);
+  });
+  if (t.choices) {
+    if (giveUp || s.sel !== t.correct) allOk = false;
+    $$("#st-choices .answer").forEach((b, k) => {
+      b.disabled = true;
+      b.classList.toggle("correct", k === t.correct);
+      b.classList.toggle("wrong", k === s.sel && k !== t.correct);
+    });
+  }
+  s.phase = "feedback";
+
+  s.queue.shift();
+  if (allOk) {
+    s.done++;
+    if (!item.tries && !s.hinted) { s.firstOk++; markStatsMistake(item.gen.id, false); }
+  } else {
+    s.missed.set(item.gen.id, item.gen.title);
+    markStatsMistake(item.gen.id, true);
+    // Wraca z nowymi liczbami: za 3 zadania, a przy kolejnej pomyłce na koniec kolejki
+    // (żeby kilka trudnych zadań nie blokowało reszty).
+    const pos = item.tries ? s.queue.length : Math.min(3, s.queue.length);
+    s.queue.splice(pos, 0, { gen: item.gen, inst: item.gen.make(s.used), tries: item.tries + 1 });
+  }
+
+  const fb = $("#st-fb");
+  fb.className = "st-fb " + (allOk ? "is-ok" : "is-bad");
+  fb.innerHTML = allOk
+    ? `<p class="st-verdict">✓ Dobrze!${s.hinted ? " (z podpowiedzią)" : ""}</p><details class="st-details"><summary>Pokaż rozwiązanie</summary><div class="st-why">${t.why}</div></details>`
+    : `<p class="st-verdict">${giveUp ? "Rozwiązanie" : "✗ Nie tym razem"} — to zadanie wróci z nowymi liczbami.</p>` +
+      notes.map((n) => `<p class="st-note">💡 ${n}</p>`).join("") + `<div class="st-why">${t.why}</div>`;
+  ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check"].forEach((sel) => $(sel).classList.add("hidden"));
+  $("#btn-st-next").classList.remove("hidden");
+  $("#btn-st-next").textContent = s.queue.length ? "Dalej" : "Zakończ";
+  updateStatsBar();
+  if (!allOk) fb.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  $("#btn-st-next").focus({ preventScroll: true });
+}
+
+function nextStats() {
+  if (state.stats.phase !== "feedback") return;
+  showStatsTask();
+}
+
+function updateStatsBar() {
+  const s = state.stats;
+  const left = s.queue.length;
+  $("#st-count").textContent = `Zostało ${left}`;
+  $("#st-score").textContent = `✓ ${s.firstOk}`;
+  $("#st-progress").style.width = Math.round((s.done / (s.done + left || 1)) * 100) + "%";
+}
+
+function finishStats() {
+  const s = state.stats;
+  $("#st-card").classList.add("hidden");
+  ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check", "#btn-st-next"].forEach((sel) => $(sel).classList.add("hidden"));
+  $("#st-kind").textContent = "";
+  if (s.id !== "review") {
+    const best = readLocal(STATS_BEST_KEY);
+    if (!best[s.id] || best[s.id].ok < s.firstOk) { best[s.id] = { ok: s.firstOk, total: s.total }; writeLocal(STATS_BEST_KEY, best); }
+  }
+  const end = $("#st-end");
+  end.classList.remove("hidden");
+  const missed = [...s.missed.values()];
+  end.innerHTML =
+    `<p class="st-end-big">${s.firstOk === s.total ? "Komplet! 🎉" : "Wszystkie zadania rozwiązane"}</p>` +
+    `<p>Za pierwszym razem: <b>${s.firstOk} / ${s.total}</b></p>` +
+    (missed.length ? `<p class="st-end-miss">Warto powtórzyć: ${missed.map(escapeHtml).join(", ")}</p>` : "") +
+    `<div class="session-controls st-end-actions"><button id="btn-st-again" class="btn btn-primary" type="button">Jeszcze raz (nowe liczby)</button></div>`;
+  $("#btn-st-again").addEventListener("click", () => startStats(s.id, s.title, s.id === "exam" ? examGens() : s.gens));
+}
+
+$("#btn-st-check").addEventListener("click", () => checkStats());
+$("#btn-st-giveup").addEventListener("click", () => checkStats(true));
+$("#btn-st-next").addEventListener("click", nextStats);
+$("#btn-st-hint").addEventListener("click", () => {
+  const s = state.stats;
+  if (s.phase !== "answer") return;
+  s.hinted = true;
+  $("#st-hint").innerHTML = `💡 ${s.queue[0].inst.hint}`;
+  $("#st-hint").classList.remove("hidden");
+  $("#btn-st-hint").disabled = true;
+});
+$("#btn-st-quit").addEventListener("click", () => { showScreen("screen-library"); renderStatsList(); });
+document.addEventListener("keydown", (e) => {
+  if ($(".screen.is-active")?.id !== "screen-stats" || !state.stats || e.target.closest("input, textarea, select")) return;
+  const s = state.stats;
+  if (e.key === "Enter" && s.phase === "feedback") { e.preventDefault(); nextStats(); }
+  else if (e.key === "Enter" && s.phase === "answer" && s.queue[0] && s.queue[0].inst.fields) { e.preventDefault(); checkStats(); }
+  else if (/^[1-6]$/.test(e.key) && s.phase === "answer") {
+    const i = Number(e.key) - 1;
+    if (i < $$("#st-choices .answer").length) { e.preventDefault(); pickStatsChoice(i); }
+  }
+});
 
 // ── Modal (ogólny) + przenoszenie materiałów do/z folderów ───────────────────
 let _modalDismiss = null; // wywoływane przy każdym zamknięciu (Escape/overlay/Zamknij)
