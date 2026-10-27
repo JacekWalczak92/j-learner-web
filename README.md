@@ -68,6 +68,18 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   Fiszki / Wszystko*, dla fiszek *Nauka / Przegląd / Wszystko*. (Bez harmonogramu
   spaced repetition — trzymamy tylko „zaliczone”.)
 
+- **Statystyka** — interaktywne zadania do wykładów 1–2 ze statystyki opisowej (psychologia):
+  zapis i operator Σ, rozkład liczebności, przedziały klasowe i histogram, skośność i kurtoza,
+  estymatory i ich cechy, średnia/mediana/dominanta, braki danych, plus **test mieszany**.
+  Liczby w zadaniach są losowane przy każdym podejściu, więc sprawdzają metodę, a nie
+  zapamiętany wynik. Rodzaje zadań: obliczenia krok po kroku (np. pozycja mediany → mediana),
+  odczyt z wykresów (histogram, kształt na tle rozkładu normalnego, oszacowania z powtórzonych
+  badań wokół μ), znajdowanie błędu w cudzym rozwiązaniu lub tabeli, wybór miary do sytuacji.
+  Dobrze rozwiązane zadanie znika; błędne pokazuje rozwiązanie i wraca z nowymi liczbami.
+  Przy typowych pomyłkach (np. mediana z nieuporządkowanych danych, proporcja zamiast procentu)
+  aplikacja mówi, na czym polega błąd. Wynik „za pierwszym razem” i „Powtórka błędów” są
+  zapisywane lokalnie w przeglądarce.
+
 ## Uruchomienie lokalnie
 
 Statyczne pliki — wystarczy serwer HTTP:
@@ -155,6 +167,7 @@ j-learner-web/
 │   ├── supabase.js     # warstwa danych: konta + foldery + materiały
 │   ├── parsers.js      # parsowanie formatów (test/fiszki)
 │   ├── neuro.js        # plansze „Neuro EN" (SVG + nazwy + sprawdzanie)
+│   ├── stats.js        # zadania „Statystyka" (generatory z losowanymi danymi)
 │   ├── styles.css      # wygląd
 │   └── app.js          # logika UI i sesji
 ├── supabase/
