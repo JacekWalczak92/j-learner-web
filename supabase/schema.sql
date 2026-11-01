@@ -189,3 +189,40 @@ create policy "audio_objects_update_own" on storage.objects for update to authen
   with check (bucket_id = 'audio' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "audio_objects_delete_own" on storage.objects for delete to authenticated
   using (bucket_id = 'audio' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  TEKSTY  (TXT z aplikacji mobilnej → zakładka „Audio" → „TXT dla ElevenReadera")
+--  Treść trzymamy wprost w tabeli (bez Storage): to zwykły tekst, rozdział to kilka–
+--  kilkadziesiąt KB. Każdy widzi swoje, a teksty kont z app_authors — wszyscy zalogowani.
+--  Klucz upsertu z aplikacji: (user_id, folder, title) — ponowne wysłanie nadpisuje.
+-- ════════════════════════════════════════════════════════════════════════════
+create table if not exists public.text_files (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title      text not null,
+  folder     text not null default '',
+  content    text not null check (char_length(content) <= 2000000),
+  size_chars integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, folder, title)
+);
+
+create index if not exists text_files_user_idx on public.text_files (user_id);
+
+drop trigger if exists trg_text_files_touch on public.text_files;
+create trigger trg_text_files_touch before update on public.text_files
+  for each row execute function public.touch_updated_at();
+
+alter table public.text_files enable row level security;
+grant select, insert, update, delete on public.text_files to authenticated;
+
+drop policy if exists "text_files_select_own_or_author" on public.text_files;
+drop policy if exists "text_files_insert_own" on public.text_files;
+drop policy if exists "text_files_update_own" on public.text_files;
+drop policy if exists "text_files_delete_own" on public.text_files;
+create policy "text_files_select_own_or_author" on public.text_files
+  for select to authenticated using (auth.uid() = user_id or public.is_author(user_id));
+create policy "text_files_insert_own" on public.text_files for insert with check (auth.uid() = user_id);
+create policy "text_files_update_own" on public.text_files for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "text_files_delete_own" on public.text_files for delete using (auth.uid() = user_id);

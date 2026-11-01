@@ -8,11 +8,11 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=18";
-import { JLDB as DB } from "./supabase.js?v=18";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=18";
+import { JLParsers as JLP } from "./parsers.js?v=20";
+import { JLDB as DB } from "./supabase.js?v=20";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=20";
 
-const APP_VERSION = "18";
+const APP_VERSION = "20";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -29,6 +29,7 @@ const state = {
   },
   pub: { items: [], query: "" },
   audio: { items: [], query: "", current: null, queue: [] },
+  texts: { items: [], query: "", cache: new Map() }, // TXT dla ElevenReadera (treść w cache po id)
   neuro: { board: null, mode: "type", answers: {}, results: {}, revealed: false, queue: [], busy: false },
   editing: null,
 };
@@ -93,6 +94,7 @@ window.addEventListener("unhandledrejection", (e) => {
 // Wygaśnięcie sesji (nieudane odświeżenie tokenu) → czysty powrót do logowania.
 DB.setSessionExpiredHandler(() => {
   document.querySelector("#user-box").classList.add("hidden");
+  document.querySelector("#drive-link").classList.add("hidden");
   showScreen("screen-auth");
   setAuthStatus("Sesja wygasła — zaloguj się ponownie.", "err");
 });
@@ -133,6 +135,7 @@ async function enterApp() {
   const u = DB.getUser();
   $("#user-email").textContent = u ? u.email : "";
   $("#user-box").classList.remove("hidden");
+  $("#drive-link").classList.remove("hidden");
   setRootLibraryView();
   state.my._dirty = true;
   showScreen("screen-library");
@@ -198,8 +201,10 @@ async function doSignUp() {
 
 function doSignOut() {
   stopAudio();
+  state.texts = { items: [], query: "", cache: new Map() };
   DB.signOut();
   $("#user-box").classList.add("hidden");
+  $("#drive-link").classList.add("hidden");
   showScreen("screen-auth");
   setAuthStatus("");
 }
@@ -274,7 +279,7 @@ function switchTab(tab) {
   $("#tab-neuro").classList.toggle("hidden", tab !== "neuro");
   setLibStatus("");
   if (tab === "mine") loadMy();
-  else if (tab === "audio") loadAudio();
+  else if (tab === "audio") showAudioView(audioView);
   else if (tab === "neuro") showNeuroView(neuroView);
   else loadPublic();
 }
@@ -624,6 +629,176 @@ $("#audio-el").addEventListener("playing", () => { delete $("#audio-el").dataset
 $("#audio-next").addEventListener("click", () => playNeighbour(1));
 $("#audio-prev").addEventListener("click", () => playNeighbour(-1));
 $("#audio-rate").addEventListener("change", (e) => { $("#audio-el").playbackRate = Number(e.target.value) || 1; });
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TXT DLA ELEVENREADERA — teksty wysłane z aplikacji mobilnej („Wyślij TXT do J-Learner web")
+// ════════════════════════════════════════════════════════════════════════════
+const AUDIO_VIEW_KEY = "jl_audio_view";
+const ELEVEN_GUIDE_KEY = "jl_eleven_guide_closed";
+let audioView = (() => { try { return localStorage.getItem(AUDIO_VIEW_KEY) === "txt" ? "txt" : "mp3"; } catch (_) { return "mp3"; } })();
+
+function showAudioView(view) {
+  audioView = view;
+  try { localStorage.setItem(AUDIO_VIEW_KEY, view); } catch (_) { /* tryb prywatny */ }
+  $$(".audio-view").forEach((b) => b.classList.toggle("is-active", b.dataset.aview === view));
+  $("#audio-mp3").classList.toggle("hidden", view !== "mp3");
+  $("#audio-txt").classList.toggle("hidden", view !== "txt");
+  if (view === "txt") loadTexts(); else loadAudio();
+}
+$$(".audio-view").forEach((b) => b.addEventListener("click", () => showAudioView(b.dataset.aview)));
+
+// Instrukcja jest rozwinięta, dopóki użytkownik jej nie zwinie (pamiętamy to lokalnie).
+try { if (localStorage.getItem(ELEVEN_GUIDE_KEY) === "1") $("#eleven-guide").open = false; } catch (_) {}
+$("#eleven-guide").addEventListener("toggle", (e) => {
+  try { localStorage.setItem(ELEVEN_GUIDE_KEY, e.target.open ? "0" : "1"); } catch (_) {}
+});
+
+async function loadTexts() {
+  setLibStatus("Wczytuję…");
+  try {
+    state.texts.items = (await DB.listTexts()) || [];
+    renderTexts(state.texts.items);
+    setLibStatus("");
+  } catch (e) {
+    const m = String(e.message || "");
+    if (/text_files/i.test(m)) setLibStatus("Teksty wymagają aktualizacji bazy: uruchom supabase/schema.sql (sekcja TEKSTY) w Supabase SQL Editor.", "err");
+    else setLibStatus(m, "err");
+  }
+}
+
+async function textContent(t) {
+  if (!state.texts.cache.has(t.id)) state.texts.cache.set(t.id, await DB.getTextContent(t.id));
+  return state.texts.cache.get(t.id);
+}
+function txtFileName(t) {
+  return String(t.title || "tekst").replace(/[\\/:*?"<>|]+/g, "_").trim() + ".txt";
+}
+function txtFile(t, text) {
+  return new File([text], txtFileName(t), { type: "text/plain" });
+}
+/** Udostępnianie pliku (Android/iOS) — tak trafia się prosto do ElevenReadera. */
+function canShareTxt() {
+  try { return !!(navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.txt", { type: "text/plain" })] })); }
+  catch (_) { return false; }
+}
+
+async function txtAction(t, what) {
+  try {
+    const text = await textContent(t);
+    if (what === "copy") {
+      await navigator.clipboard.writeText(text);
+      showToast("Skopiowano tekst — wklej go w ElevenReaderze (+ → tekst).", "ok");
+    } else if (what === "download") {
+      const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url; link.download = txtFileName(t);
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } else if (what === "share") {
+      await navigator.share({ files: [txtFile(t, text)], title: t.title });
+    }
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // zamknięto okno udostępniania
+    showToast(err.message || String(err), "err");
+  }
+}
+
+function renderTexts(allItems) {
+  const query = state.texts.query;
+  const items = allItems.filter((t) => matchesQuery(t.title, query) || matchesQuery(t.folder, query));
+  const box = $("#txt-list");
+  box.innerHTML = "";
+  const empty = $("#txt-empty");
+  empty.textContent = query && allItems.length > 0
+    ? "Nic nie pasuje do wyszukiwania."
+    : "Brak tekstów. W aplikacji mobilnej (AI Lab) przy podsumowaniu słownym albo notatce wybierz „Wyślij TXT do J-Learner web”.";
+  empty.classList.toggle("hidden", items.length > 0);
+
+  // Grupowanie jak w MP3: własne, potem „Od autora"; folder, potem tytuł (rozdziały numerycznie).
+  const uid = DB.getUserId();
+  const groups = new Map();
+  items.forEach((t) => {
+    const key = (t.user_id && t.user_id !== uid ? "1" : "0") + (t.folder || "");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  });
+  const coll = new Intl.Collator("pl", { numeric: true });
+  const keys = Array.from(groups.keys()).sort((a, b) =>
+    a[0].localeCompare(b[0]) || (a.length === 1) - (b.length === 1) || coll.compare(a, b));
+  const share = canShareTxt();
+  keys.forEach((key) => {
+    const shared = key[0] === "1";
+    const folder = key.slice(1);
+    const h = document.createElement("h3");
+    h.className = "audio-folder";
+    h.textContent = (shared ? "Od autora · " : "") + (folder || "Bez folderu");
+    box.appendChild(h);
+    const ul = document.createElement("ul");
+    ul.className = "lib-list";
+    groups.get(key).sort((a, b) => coll.compare(a.title, b.title)).forEach((t) => {
+      const li = document.createElement("li");
+      const mins = Math.max(1, Math.round((Number(t.size_chars) || 0) / 900)); // ~150 słów/min
+      li.appendChild(libCard({
+        kind: "file", icon: "📄", name: t.title,
+        sub: (Number(t.size_chars) || 0).toLocaleString("pl") + " znaków · ok. " + mins + " min · " + fmtDate(t.updated_at || t.created_at),
+        onOpen: () => openText(t, shared),
+        actions: [
+          share && { glyph: "↗", label: "Udostępnij (ElevenReader)", onClick: () => txtAction(t, "share") },
+          { glyph: "⧉", label: "Kopiuj tekst", onClick: () => txtAction(t, "copy") },
+          { glyph: "⤓", label: "Pobierz .txt", onClick: () => txtAction(t, "download") },
+          !shared && { glyph: "✕", label: "Usuń", danger: true, onClick: () => removeText(t) },
+        ],
+      }));
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+  });
+}
+
+async function removeText(t) {
+  const ok = await modalConfirm("Usunąć tekst?", `Plik „${t.title}" zostanie usunięty z J-Learner web.`, { danger: true, okLabel: "Usuń" });
+  if (!ok) return;
+  try {
+    await DB.deleteText(t.id);
+    state.texts.cache.delete(t.id);
+    loadTexts();
+  } catch (err) { setLibStatus(err.message, "err"); }
+}
+
+/** Podgląd tekstu w modalu + te same akcje co w menu „⋯". */
+async function openText(t, shared) {
+  let text;
+  try { text = await textContent(t); } catch (err) { setLibStatus(err.message, "err"); return; }
+  openModal(t.title, (body) => {
+    const row = document.createElement("div");
+    row.className = "modal-btn-row txt-actions";
+    const btn = (label, cls, fn) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn btn-sm " + cls; b.textContent = label;
+      b.addEventListener("click", fn);
+      row.appendChild(b);
+    };
+    if (canShareTxt()) btn("Udostępnij → ElevenReader", "btn-primary", () => txtAction(t, "share"));
+    btn("Kopiuj tekst", "btn-ghost", () => txtAction(t, "copy"));
+    btn("Pobierz .txt", "btn-ghost", () => txtAction(t, "download"));
+    body.appendChild(row);
+    const pre = document.createElement("div");
+    pre.className = "txt-preview";
+    pre.textContent = text; // textContent — bez wstawiania HTML
+    body.appendChild(pre);
+    if (shared) {
+      const p = document.createElement("p");
+      p.className = "modal-sub";
+      p.textContent = "Tekst od autora — tylko do odczytu.";
+      body.appendChild(p);
+    }
+  });
+}
+
+$("#txt-search").addEventListener("input", (e) => {
+  state.texts.query = e.target.value.trim().toLowerCase();
+  renderTexts(state.texts.items);
+});
 
 function libCard(o) {
   const { kind, icon, name, sub, onOpen } = o;
