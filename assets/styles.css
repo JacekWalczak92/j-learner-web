@@ -225,6 +225,18 @@ button:disabled { -webkit-text-fill-color: currentColor; }
   white-space: nowrap;
 }
 
+/* Link do folderu autora na Dysku Google — w pasku, widoczny na każdym ekranie. */
+.btn.drive-link {
+  flex: 0 0 auto;
+  border: 1px solid var(--indigo);
+  background: var(--indigo-soft);
+  color: var(--ink);
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn.drive-link:hover { background: var(--indigo); color: #fff; }
+
 /* ── Layout ───────────────────────────────────────────────────────────────── */
 .main {
   flex: 1;
