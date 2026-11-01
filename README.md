@@ -26,6 +26,11 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   konta autora (tabela `app_authors`) widzą wszyscy zalogowani w sekcjach „Od autora · …”
   (odsłuch i pobieranie, bez usuwania). Wymaga uruchomienia aktualnego `supabase/schema.sql`
   (sekcja AUDIO) i dopisania swojego konta do `app_authors` (polecenie w komentarzu tam).
+  Przełącznik **MP3 / TXT · ElevenReader**: w widoku TXT są teksty wysłane z aplikacji
+  (AI Lab → „Wyślij TXT do J-Learner web”, przy podsumowaniu słownym i notatce) z instrukcją,
+  jak słuchać ich w ElevenReaderze. Przy każdym pliku: podgląd, Udostępnij (na telefonie —
+  prosto do ElevenReadera), Kopiuj tekst, Pobierz .txt, Usuń. Treść leży w tabeli
+  `text_files` (sekcja TEKSTY w `supabase/schema.sql`), teksty autora widzą wszyscy zalogowani.
 - **Neuro EN** — nauka angielskich nazw struktur mózgu i neuronu (np. dla psychologów).
   Plansze (własne rysunki SVG): mózg — widok boczny, mózg — przekrój pośrodkowy
   (z hipokampem, korą, pniem i rdzeniem), neuron, synapsa, typy neuronów (kształt i funkcja)

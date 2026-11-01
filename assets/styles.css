@@ -809,6 +809,32 @@ select.text-input {
 .audio-player audio { width: 100%; }
 .audio-controls { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
 .audio-rate { width: auto; min-height: 38px; padding: 6px 10px; }
+/* ── TXT dla ElevenReadera ── */
+.eleven-guide {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--elevated);
+  line-height: 1.5;
+}
+.eleven-guide summary { cursor: pointer; font-weight: 800; }
+.eleven-guide p, .eleven-guide ol { margin: 10px 0 0; }
+.eleven-guide ol { padding-left: 1.3em; display: grid; gap: 6px; }
+.eleven-links { color: var(--muted); font-size: 0.9rem; }
+.eleven-links a { color: var(--indigo); }
+.modal-btn-row.txt-actions { flex-wrap: wrap; justify-content: flex-start; margin-bottom: 12px; }
+.txt-preview {
+  max-height: 55vh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
 
 .lib-empty {
   margin: 18px 0 0;
@@ -1751,7 +1777,7 @@ select.text-input {
   border-radius: 999px;
   background: var(--elevated);
 }
-.nb-mode {
+.nb-mode, .audio-view {
   min-height: 38px;
   padding: 6px 14px;
   border: 0;
@@ -1761,7 +1787,7 @@ select.text-input {
   font-weight: 750;
   cursor: pointer;
 }
-.nb-mode.is-active { background: var(--indigo); color: #fff; }
+.nb-mode.is-active, .audio-view.is-active { background: var(--indigo); color: #fff; }
 .nb-point {
   display: flex;
   flex-direction: column;
@@ -1817,7 +1843,7 @@ select.text-input {
   .nb-layout { grid-template-columns: minmax(0, 1fr); }
   .nb-point { padding: 12px 14px; }
   .nb-modes { display: flex; width: 100%; }
-  .nb-mode { flex: 1 1 0; min-width: 0; padding-inline: 6px; font-size: clamp(0.76rem, 3.3vw, 0.9rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nb-mode, .audio-view { flex: 1 1 0; min-width: 0; padding-inline: 6px; font-size: clamp(0.76rem, 3.3vw, 0.9rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Na telefonie rysunek zostaje przypięty, ale niski — pod nim jest miejsce na pola. */
   #screen-neuro .session-bar { position: static; }
   .nb-figure { top: calc(96px + env(safe-area-inset-top, 0px)); z-index: 5; background: #fbf8f2; }

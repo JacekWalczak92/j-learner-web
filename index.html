@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="assets/styles.css?v=18" />
+  <link rel="stylesheet" href="assets/styles.css?v=20" />
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
@@ -101,6 +101,11 @@
       </div>
 
       <div id="tab-audio" class="hidden">
+        <div class="nb-modes" role="tablist" aria-label="Audio">
+          <button class="audio-view is-active" role="tab" type="button" data-aview="mp3">🎧 MP3</button>
+          <button class="audio-view" role="tab" type="button" data-aview="txt">📄 TXT · ElevenReader</button>
+        </div>
+        <div id="audio-mp3">
         <div id="audio-player" class="audio-player hidden">
           <div class="audio-now">
             <span class="audio-now-label">Teraz gra</span>
@@ -125,6 +130,30 @@
         </div>
         <div id="audio-list"></div>
         <p id="audio-empty" class="lib-empty hidden">Brak nagrań. W aplikacji mobilnej (AI Lab) utwórz MP3 i wybierz „Wyślij MP3 do J-Learner web”.</p>
+        </div>
+
+        <div id="audio-txt" class="hidden">
+          <details id="eleven-guide" class="eleven-guide" open>
+            <summary>Jak słuchać tych tekstów w ElevenReaderze?</summary>
+            <p>ElevenReader (aplikacja ElevenLabs) czyta tekst naturalnym lektorem — nie trzeba tworzyć MP3.
+              Darmowy plan ma miesięczny limit godzin słuchania.</p>
+            <ol>
+              <li><strong>Telefon, najszybciej:</strong> otwórz plik poniżej i stuknij <em>Udostępnij</em> → wybierz <em>ElevenReader</em>. Tekst od razu trafi do jego Biblioteki.</li>
+              <li><strong>Z pliku:</strong> <em>Pobierz .txt</em>, potem w ElevenReaderze <em>+</em> (Dodaj) → import pliku → wybierz plik z folderu Pobrane.</li>
+              <li><strong>Przez schowek:</strong> <em>Kopiuj tekst</em>, potem w ElevenReaderze <em>+</em> → wklej / wpisz tekst → zapisz.</li>
+              <li>W odtwarzaczu ElevenReadera wybierz głos i tempo. Każdy rozdział to osobny plik — dodawaj je po kolei.</li>
+            </ol>
+            <p class="eleven-links">
+              <a href="https://play.google.com/store/apps/details?id=io.elevenlabs.readerapp" target="_blank" rel="noopener noreferrer">ElevenReader w Google Play</a>
+              · <a href="https://elevenreader.io/" target="_blank" rel="noopener noreferrer">elevenreader.io (iPhone, przeglądarka)</a>
+            </p>
+          </details>
+          <div class="lib-tools">
+            <input id="txt-search" class="text-input lib-search" type="search" placeholder="Szukaj tekstów…" aria-label="Szukaj tekstów" />
+          </div>
+          <div id="txt-list"></div>
+          <p id="txt-empty" class="lib-empty hidden">Brak tekstów. W aplikacji mobilnej (AI Lab) przy podsumowaniu słownym albo notatce wybierz „Wyślij TXT do J-Learner web”.</p>
+        </div>
       </div>
 
       <div id="tab-neuro" class="hidden">
@@ -413,6 +442,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=18"></script>
+  <script type="module" src="assets/app.js?v=20"></script>
 </body>
 </html>
