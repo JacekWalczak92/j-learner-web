@@ -94,6 +94,7 @@ window.addEventListener("unhandledrejection", (e) => {
 // Wygaśnięcie sesji (nieudane odświeżenie tokenu) → czysty powrót do logowania.
 DB.setSessionExpiredHandler(() => {
   document.querySelector("#user-box").classList.add("hidden");
+  document.querySelector("#drive-link").classList.add("hidden");
   showScreen("screen-auth");
   setAuthStatus("Sesja wygasła — zaloguj się ponownie.", "err");
 });
@@ -134,6 +135,7 @@ async function enterApp() {
   const u = DB.getUser();
   $("#user-email").textContent = u ? u.email : "";
   $("#user-box").classList.remove("hidden");
+  $("#drive-link").classList.remove("hidden");
   setRootLibraryView();
   state.my._dirty = true;
   showScreen("screen-library");
@@ -202,6 +204,7 @@ function doSignOut() {
   state.texts = { items: [], query: "", cache: new Map() };
   DB.signOut();
   $("#user-box").classList.add("hidden");
+  $("#drive-link").classList.add("hidden");
   showScreen("screen-auth");
   setAuthStatus("");
 }
