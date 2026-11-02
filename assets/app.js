@@ -8,13 +8,13 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=21";
-import { JLDB as DB } from "./supabase.js?v=21";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=21";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=21";
-import { STAT_LABS } from "./stats-lab.js?v=21";
+import { JLParsers as JLP } from "./parsers.js?v=22";
+import { JLDB as DB } from "./supabase.js?v=22";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=22";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=22";
+import { STAT_LABS } from "./stats-lab.js?v=22";
 
-const APP_VERSION = "21";
+const APP_VERSION = "22";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -96,7 +96,7 @@ window.addEventListener("unhandledrejection", (e) => {
 // Wygaśnięcie sesji (nieudane odświeżenie tokenu) → czysty powrót do logowania.
 DB.setSessionExpiredHandler(() => {
   document.querySelector("#user-box").classList.add("hidden");
-  document.querySelector("#drive-link").classList.add("hidden");
+  document.querySelector("#drive-links").classList.add("hidden");
   showScreen("screen-auth");
   setAuthStatus("Sesja wygasła — zaloguj się ponownie.", "err");
 });
@@ -137,7 +137,7 @@ async function enterApp() {
   const u = DB.getUser();
   $("#user-email").textContent = u ? u.email : "";
   $("#user-box").classList.remove("hidden");
-  $("#drive-link").classList.remove("hidden");
+  $("#drive-links").classList.remove("hidden");
   setRootLibraryView();
   state.my._dirty = true;
   showScreen("screen-library");
@@ -206,7 +206,7 @@ function doSignOut() {
   state.texts = { items: [], query: "", cache: new Map() };
   DB.signOut();
   $("#user-box").classList.add("hidden");
-  $("#drive-link").classList.add("hidden");
+  $("#drive-links").classList.add("hidden");
   showScreen("screen-auth");
   setAuthStatus("");
 }

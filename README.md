@@ -19,8 +19,8 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
     (pokaż odpowiedź → Powtórz / Trudne / Dobre / Łatwe);
   - fiszki: **Nauka** (przerabiasz całość, karta wraca aż „Łatwe") i **Przegląd**
     (szybka powtórka — „Dobre" lub „Łatwe" kończy kartę).
-- **Dysk Google** — przycisk „📁 Dysk Google” w górnym pasku (po zalogowaniu) otwiera
-  folder z materiałami autora na Google Drive.
+- **Dysk Google** — przyciski „📁 Dysk Google” i „📁 Dysk roku” w górnym pasku (po
+  zalogowaniu) otwierają foldery na Google Drive: materiały autora i wspólny dysk roku.
 - **Audio** — zakładka z nagraniami MP3 wysłanymi z aplikacji mobilnej (AI Lab →
   „Wyślij MP3 do J-Learner web”): lista pogrupowana w foldery, odtwarzacz z tempem
   0.8–2×, automatycznie gra kolejny plik (np. następny rozdział), pobieranie i usuwanie.
