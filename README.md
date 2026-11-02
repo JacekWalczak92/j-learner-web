@@ -33,6 +33,7 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   jak słuchać ich w ElevenReaderze. Przy każdym pliku: podgląd, Udostępnij (na telefonie —
   prosto do ElevenReadera), Kopiuj tekst, Pobierz .txt, Usuń. Treść leży w tabeli
   `text_files` (sekcja TEKSTY w `supabase/schema.sql`), teksty autora widzą wszyscy zalogowani.
+- **Przedmioty** — zakładka z modułami do nauki; po wejściu wybierasz moduł (Neuro EN, Statystyka).
 - **Neuro EN** — nauka angielskich nazw struktur mózgu i neuronu (np. dla psychologów).
   Plansze (własne rysunki SVG): mózg — widok boczny, mózg — przekrój pośrodkowy
   (z hipokampem, korą, pniem i rdzeniem), neuron, synapsa, typy neuronów (kształt i funkcja)
@@ -75,7 +76,15 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   Fiszki / Wszystko*, dla fiszek *Nauka / Przegląd / Wszystko*. (Bez harmonogramu
   spaced repetition — trzymamy tylko „zaliczone”.)
 
-- **Statystyka** — interaktywne zadania do wykładów 1–2 ze statystyki opisowej (psychologia):
+- **Statystyka** — moduł do wykładów 1–2 ze statystyki opisowej (psychologia), w dwóch częściach:
+  - **Laboratorium** — sześć interaktywnych, wizualnych wyjaśnień: Σ jako pętla (suwaki granic,
+    liczenie krok po kroku), rozkład liczebności na żywo (klikane wyniki → tabela, histogram,
+    przedziały z granicami dokładnymi), huśtawka średnia vs mediana (przeciągane punkty, wynik
+    skrajny), kształt rozkładu (suwak skośności z M/Me/Mo, kurtoza na tle normalnego),
+    strzelnica estymatorów (powtarzane badanie: obciążenie, skuteczność, zgodność) i braki
+    danych (losowe vs nielosowe braki, imputacja dominantą). Każde ma krótkie wyzwania.
+  - **Zadania** na trzech poziomach: Start (mniej danych, podpowiedź od razu), Średni,
+    Ekspert (więcej danych, bez podpowiedzi). Tematy:
   zapis i operator Σ, rozkład liczebności, przedziały klasowe i histogram, skośność i kurtoza,
   estymatory i ich cechy, średnia/mediana/dominanta, braki danych, plus **test mieszany**.
   Liczby w zadaniach są losowane przy każdym podejściu, więc sprawdzają metodę, a nie
@@ -175,6 +184,7 @@ j-learner-web/
 │   ├── parsers.js      # parsowanie formatów (test/fiszki)
 │   ├── neuro.js        # plansze „Neuro EN" (SVG + nazwy + sprawdzanie)
 │   ├── stats.js        # zadania „Statystyka" (generatory z losowanymi danymi)
+│   ├── stats-lab.js    # „Statystyka → Laboratorium" (interaktywne wizualizacje)
 │   ├── styles.css      # wygląd
 │   └── app.js          # logika UI i sesji
 ├── supabase/

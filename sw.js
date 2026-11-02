@@ -27,6 +27,7 @@ const SHELL = [
   "./assets/supabase.js?v=" + VERSION,
   "./assets/neuro.js?v=" + VERSION,
   "./assets/stats.js?v=" + VERSION,
+  "./assets/stats-lab.js?v=" + VERSION,
   "./assets/config.js?v=" + VERSION,
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",

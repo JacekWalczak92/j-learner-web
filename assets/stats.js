@@ -21,6 +21,17 @@ function shuffle(arr) {
   return a;
 }
 const sum = (arr) => arr.reduce((s, x) => s + x, 0);
+
+// ── Poziomy: Start (mniej danych, podpowiedź od razu), Średni, Ekspert (więcej danych, bez podpowiedzi) ──
+export const STAT_LEVELS = {
+  1: { name: "Start", desc: "Mniej liczb w zadaniach, podpowiedź widoczna od razu. Dobre na pierwsze podejście do tematu." },
+  2: { name: "Średni", desc: "Standardowe zadania. Podpowiedź na życzenie — wtedy zadanie nie liczy się do wyniku „za 1. razem”." },
+  3: { name: "Ekspert", desc: "Więcej danych i bez podpowiedzi — jak na kolokwium." },
+};
+let LV = 2;
+export function setStatsLevel(l) { LV = STAT_LEVELS[l] ? l : 2; }
+/** Liczebność danych zależna od poziomu (a–b to zakres dla poziomu Średni). */
+const nn = (a, b) => (LV === 1 ? ri(Math.max(3, a - 2), a) : LV === 3 ? ri(b, b + Math.ceil((b - a) * 1.5) + 2) : ri(a, b));
 const sorted = (arr) => arr.slice().sort((a, b) => a - b);
 function median(arr) {
   const s = sorted(arr), n = s.length;
@@ -178,7 +189,7 @@ function bankGen(id, topic, title, bank) {
 const sigRange = {
   id: "sig-range", topic: "sigma", title: "Suma fragmentu danych",
   make() {
-    const n = ri(6, 9), d = Array.from({ length: n }, () => ri(3, 25));
+    const n = nn(6, 9), d = Array.from({ length: n }, () => ri(3, 25));
     const all = Math.random() < 0.2;
     const a = all ? 1 : ri(1, n - 2), b = all ? n : ri(a + 2, n);
     const part = d.slice(a - 1, b), res = sum(part);
@@ -205,9 +216,9 @@ const sigRange = {
 const sigIndex = {
   id: "sig-index", topic: "sigma", title: "Indeks a wynik",
   make() {
-    const n = ri(6, 9);
+    const n = nn(6, 9);
     let d;
-    do { d = Array.from({ length: n }, () => ri(1, 20)); } while (new Set(d).size < n);
+    do { d = Array.from({ length: n }, () => ri(1, 20 + 2 * n)); } while (new Set(d).size < n);
     const k = ri(1, n);
     let j; do { j = ri(1, n); } while (j === k);
     const v = d[j - 1];
@@ -313,7 +324,7 @@ const sigConcept = bankGen("sig-concept", "sigma", "Pojęcia: zmienna, n i N", [
 const freqBuild = {
   id: "freq-build", topic: "freq", title: "Rozkład liczebności z surowych danych",
   make() {
-    const n = ri(12, 20), lo = ri(10, 30);
+    const n = nn(12, 20), lo = ri(10, 30);
     const data = bumpData(n, lo, 6);
     const t = freqTable(data);
     const row = pick(t.slice(0, -1).length ? t.slice(0, -1) : t);
@@ -447,7 +458,7 @@ const clsCount = {
   id: "cls-count", topic: "classes", title: "Liczebność w przedziale",
   make() {
     const w = ri(2, 3), k = 5, lo = ri(10, 40);
-    const n = ri(15, 22);
+    const n = nn(15, 22);
     const data = bumpData(n, lo, w * k);
     const cls = Array.from({ length: k }, (_, i) => {
       const a = lo + i * w, b = a + w - 1;
@@ -700,7 +711,7 @@ const estMeasure = bankGen("est-measure", "estim", "Średnia, mediana czy domina
 const ctMean = {
   id: "ct-mean", topic: "central", title: "Średnia krok po kroku",
   make() {
-    const n = ri(5, 9), d = Array.from({ length: n }, () => ri(5, 40));
+    const n = nn(5, 9), d = Array.from({ length: n }, () => ri(5, 40));
     const s = sum(d), m = s / n;
     return {
       q: `Wyniki: ${list(d)}. Policz sumę, n i średnią (do 0,01).`,
@@ -718,7 +729,7 @@ const ctMean = {
 const ctMedian = {
   id: "ct-median", topic: "central", title: "Mediana krok po kroku",
   make() {
-    const n = ri(6, 11);
+    const n = nn(6, 11);
     let d;
     do { d = Array.from({ length: n }, () => ri(1, 50)); } while (median(d) === d[Math.floor((n - 1) / 2)]);
     const pos = (n + 1) / 2, me = median(d), s = sorted(d);
@@ -847,7 +858,7 @@ const ctError = {
 const ctRange = {
   id: "ct-range", topic: "central", title: "Rozstęp",
   make() {
-    const n = ri(6, 10), d = Array.from({ length: n }, () => ri(5, 60));
+    const n = nn(6, 10), d = Array.from({ length: n }, () => ri(5, 60));
     const mx = Math.max(...d), mn = Math.min(...d);
     return {
       q: `Wyniki: ${list(d)}. Ile wynosi rozstęp?`,

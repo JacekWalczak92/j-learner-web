@@ -33,12 +33,13 @@ Edge Function `publish-material`).
 
 | Plik | Rola |
 |---|---|
-| `index.html` | Cały markup; ekrany jako `<section class="screen">`: `screen-auth`, `screen-library` (zakładki: Moje materiały / Od autora / Audio / Neuro EN / Statystyka), `screen-editor`, `screen-ready`, `screen-test`, `screen-flash`, `screen-results`, `screen-neuro`, `screen-fill`, `screen-stats`. CSP w `<meta>`. |
+| `index.html` | Cały markup; ekrany jako `<section class="screen">`: `screen-auth`, `screen-library` (zakładki: Moje materiały / Od autora / Audio / Przedmioty → moduły Neuro EN i Statystyka, `showSubject`), `screen-editor`, `screen-ready`, `screen-test`, `screen-flash`, `screen-results`, `screen-neuro`, `screen-fill`, `screen-stats`, `screen-lab`. CSP w `<meta>`. |
 | `assets/app.js` (~1700 linii) | Cała logika UI: logowanie/rejestracja/reset hasła, biblioteka (foldery, kategorie, wyszukiwarka, sortowanie), modale, edytor, ekran startu sesji, silniki trybów nauki, zapis postępu, wyniki. |
 | `assets/supabase.js` | Warstwa danych, eksportuje `JLDB`: sesja (localStorage + odświeżanie tokenu), `rest()`, foldery, materiały, postęp. |
 | `assets/parsers.js` | Eksportuje `JLParsers`: `parseTestText`, `parseFlashcardText`, `detectMaterialType` itd. |
 | `assets/neuro.js` | Eksportuje `NEURO_BOARDS` (plansze „Neuro EN": własne SVG, elementy `{ n, en[], pl, x, y, lx, ly }`), `boardSvgMarkup`, `gradeAnswer` (EN lub PL przez `plAnswers`). UI w `app.js` (sekcja NEURO EN): tryby `type` / `match` / `trans`; najlepsze wyniki w localStorage `jl_neuro_best` (klucze `id`, `id:match`, `id:trans`); błędy do „Powtórki błędów” w `jl_neuro_mistakes` (`boardId:n`). Fiszki: `neuroVocabDecks()` (plansze + `GENERAL_TERMS`) → `openNeuroDeck` tworzy `state.material` z `id: null` i używa zwykłego `renderReady`. Zdania z lukami: `FILL_SETS` (luka `{a|b}`, `{@grupa:a}` = dowolna kolejność w grupie), `parseFillSentence`, `gradeFillBlanks`; ekran `screen-fill`. |
 | `assets/stats.js` | „Statystyka": `STAT_TOPICS` (tematy → listy generatorów), `examGens()`, `parseNum`, `numClose`, `fmt`. Generator = `{ id, topic, title, make(used) }`; `make` losuje dane i zwraca `{ q, fig?, fields?: [{ label, ans, d, traps? }], choices?, correct?, hint, why }` (`d` = miejsca po przecinku: 0 dokładnie, inaczej ±1 na ostatnim; `traps` = typowe błędy → podpowiedź). Pytania pojęciowe: `bankGen`. UI w `app.js` (sekcja STATYSTYKA, ekran `screen-stats`): dobrze rozwiązane znikają, błędne wracają z nowymi liczbami; localStorage `jl_stats_best`, `jl_stats_mistakes`. |
+| `assets/stats-lab.js` | „Statystyka → Laboratorium": `STAT_LABS` = `{ id, title, sub, icon, mount(host) }`; `mount` buduje interaktywny DOM/SVG (suwaki, przeciąganie, symulacje) + wyzwania (`challenges`). Ekran `screen-lab`. Poziom zadań (`STAT_LEVELS`, `setStatsLevel`) w `stats.js`, zapis w localStorage `jl_stats_level`; najlepsze wyniki per poziom (`id:poziom`). |
 | `assets/config.js` | `JL_CONFIG` = `{ supabaseUrl, supabaseAnonKey }`. |
 | `assets/styles.css` | Cały wygląd (~1600 linii). |
 | `sw.js` | Service worker: cache shellu (cache-first dla zasobów z `?v=`). |
@@ -104,7 +105,7 @@ Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
 frontendu podbij numer (obecnie **21**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
-2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js`, `neuro.js` i `stats.js` oraz `APP_VERSION`,
+2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js`, `neuro.js`, `stats.js` i `stats-lab.js` oraz `APP_VERSION`,
 3. `assets/supabase.js` — `?v=N` w imporcie `config.js`,
 4. `sw.js` — stała `VERSION`.
 

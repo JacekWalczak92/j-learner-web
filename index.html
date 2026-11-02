@@ -69,8 +69,7 @@
         <button class="source-tab is-active" role="tab" data-tab="mine"><span class="tab-long">Moje materiały</span><span class="tab-short">Moje</span></button>
         <button class="source-tab" role="tab" data-tab="public">Od autora</button>
         <button class="source-tab" role="tab" data-tab="audio">Audio</button>
-        <button class="source-tab" role="tab" data-tab="neuro">Neuro EN</button>
-        <button class="source-tab" role="tab" data-tab="stats"><span class="tab-long">Statystyka</span><span class="tab-short">Stat</span></button>
+        <button class="source-tab" role="tab" data-tab="subjects"><span class="tab-long">Przedmioty</span><span class="tab-short">Przedm.</span></button>
       </div>
 
       <div id="tab-mine">
@@ -158,6 +157,25 @@
         </div>
       </div>
 
+      <div id="tab-subjects" class="hidden">
+        <div id="subj-home">
+          <p class="nb-intro">Wybierz moduł do nauki.</p>
+          <div class="subj-grid">
+            <button class="subj-card" type="button" data-subj="neuro">
+              <span class="subj-ico">🧠</span><span class="subj-name">Neuro EN</span>
+              <span class="subj-sub">Angielskie nazwy struktur mózgu i neuronu: plansze, fiszki, zdania z lukami</span>
+            </button>
+            <button class="subj-card" type="button" data-subj="stats">
+              <span class="subj-ico">📊</span><span class="subj-name">Statystyka</span>
+              <span class="subj-sub">Wykłady 1–2: interaktywne laboratorium pojęć i zadania na trzech poziomach</span>
+            </button>
+          </div>
+        </div>
+        <div id="subj-bar" class="subj-bar hidden">
+          <button id="btn-subj-back" class="btn btn-ghost btn-sm" type="button">← Przedmioty</button>
+          <span id="subj-title" class="subj-title"></span>
+        </div>
+
       <div id="tab-neuro" class="hidden">
         <div class="nb-modes" role="tablist" aria-label="Neuro EN">
           <button class="nb-mode neuro-view is-active" role="tab" type="button" data-view="boards">🧠 Plansze</button>
@@ -182,12 +200,38 @@
       </div>
 
       <div id="tab-stats" class="hidden">
-        <p class="nb-intro">Zadania do wykładów 1–2 ze statystyki. Liczby są losowane za każdym razem, więc trzeba umieć
-          metodę, a nie zapamiętać wynik. Dobrze rozwiązane zadanie znika; błędne wraca za chwilę z nowymi danymi.</p>
-        <ul id="stats-list" class="lib-list"></ul>
+        <div class="nb-modes" role="tablist" aria-label="Statystyka">
+          <button class="nb-mode stats-view is-active" role="tab" type="button" data-view="lab">🔬 Laboratorium</button>
+          <button class="nb-mode stats-view" role="tab" type="button" data-view="tasks">✎ Zadania</button>
+        </div>
+        <div id="stats-lab-view">
+          <p class="nb-intro">Zacznij tutaj: każde pojęcie z wykładu można „pomacać” — przesuwasz suwaki, przeciągasz punkty,
+            powtarzasz badanie i od razu widzisz, co się zmienia. Na końcu każdego laboratorium są krótkie wyzwania.</p>
+          <ul id="stats-labs" class="lib-list"></ul>
+        </div>
+        <div id="stats-tasks-view" class="hidden">
+          <div class="st-level">
+            <span class="lab-small">Poziom:</span>
+            <div id="st-level" class="nb-dir" role="group" aria-label="Poziom zadań">
+              <button class="nb-chip" type="button" data-lv="1">🌱 Start</button>
+              <button class="nb-chip" type="button" data-lv="2">📘 Średni</button>
+              <button class="nb-chip" type="button" data-lv="3">🔥 Ekspert</button>
+            </div>
+          </div>
+          <p id="st-level-desc" class="nb-intro"></p>
+          <ul id="stats-list" class="lib-list"></ul>
+        </div>
+      </div>
       </div>
 
       <p id="lib-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ───────────────────────── STATYSTYKA: LABORATORIUM ───────────────────────── -->
+    <section id="screen-lab" class="screen">
+      <div class="nb-head"><h1 id="lab-title" class="nb-title"></h1></div>
+      <div id="lab-body" class="lab-body"></div>
+      <div class="session-controls"><button id="btn-lab-quit" class="btn btn-link" type="button">Wróć do laboratorium</button></div>
     </section>
 
     <!-- ───────────────────────── STATYSTYKA: ZADANIA ───────────────────────── -->

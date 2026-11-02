@@ -11,7 +11,8 @@ if (window.self !== window.top) {
 import { JLParsers as JLP } from "./parsers.js?v=21";
 import { JLDB as DB } from "./supabase.js?v=21";
 import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=21";
-import { STAT_TOPICS, STAT_EXAM_SIZE, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=21";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=21";
+import { STAT_LABS } from "./stats-lab.js?v=21";
 
 const APP_VERSION = "21";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
@@ -277,13 +278,11 @@ function switchTab(tab) {
   $("#tab-mine").classList.toggle("hidden", tab !== "mine");
   $("#tab-public").classList.toggle("hidden", tab !== "public");
   $("#tab-audio").classList.toggle("hidden", tab !== "audio");
-  $("#tab-neuro").classList.toggle("hidden", tab !== "neuro");
-  $("#tab-stats").classList.toggle("hidden", tab !== "stats");
+  $("#tab-subjects").classList.toggle("hidden", tab !== "subjects");
   setLibStatus("");
   if (tab === "mine") loadMy();
   else if (tab === "audio") showAudioView(audioView);
-  else if (tab === "neuro") showNeuroView(neuroView);
-  else if (tab === "stats") renderStatsList();
+  else if (tab === "subjects") showSubject(null);
   else loadPublic();
 }
 $$('.source-tab[data-tab]').forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
@@ -1650,6 +1649,22 @@ function updateMatchStats() {
 $("#btn-nb-quit").addEventListener("click", () => { showScreen("screen-library"); renderNeuroList(); });
 
 // ════════════════════════════════════════════════════════════════════════════
+//  PRZEDMIOTY — wybór modułu (Neuro EN, Statystyka); po wejściu w zakładkę zawsze lista modułów
+// ════════════════════════════════════════════════════════════════════════════
+const SUBJECTS = { neuro: "🧠 Neuro EN", stats: "📊 Statystyka" };
+function showSubject(id) {
+  $("#subj-home").classList.toggle("hidden", !!id);
+  $("#subj-bar").classList.toggle("hidden", !id);
+  $("#tab-neuro").classList.toggle("hidden", id !== "neuro");
+  $("#tab-stats").classList.toggle("hidden", id !== "stats");
+  $("#subj-title").textContent = id ? SUBJECTS[id] : "";
+  if (id === "neuro") showNeuroView(neuroView);
+  else if (id === "stats") showStatsView(statsView);
+}
+$$(".subj-card").forEach((c) => c.addEventListener("click", () => showSubject(c.dataset.subj)));
+$("#btn-subj-back").addEventListener("click", () => showSubject(null));
+
+// ════════════════════════════════════════════════════════════════════════════
 //  STATYSTYKA — zadania z losowanymi danymi (stats.js); dobrze rozwiązane znikają
 // ════════════════════════════════════════════════════════════════════════════
 // Tylko lokalnie: najlepsze wyniki „za pierwszym razem" i typy zadań z błędami.
@@ -1670,11 +1685,56 @@ function markStatsMistake(genId, wrong) {
 }
 function plTask(n) { return plural(n, "zadanie", "zadania", "zadań"); }
 
+// ── Widok Laboratorium / Zadania + poziom ────────────────────────────────────
+const STATS_LEVEL_KEY = "jl_stats_level";
+let statsView = "lab";
+let statsLevel = 2;
+try { statsLevel = Number(localStorage.getItem(STATS_LEVEL_KEY)) || 2; } catch (_) { /* tryb prywatny */ }
+setStatsLevel(statsLevel);
+function showStatsView(view) {
+  statsView = view;
+  $$(".stats-view").forEach((b) => b.classList.toggle("is-active", b.dataset.view === view));
+  $("#stats-lab-view").classList.toggle("hidden", view !== "lab");
+  $("#stats-tasks-view").classList.toggle("hidden", view !== "tasks");
+  if (view === "lab") renderStatsLabs(); else renderStatsList();
+}
+$$(".stats-view").forEach((b) => b.addEventListener("click", () => showStatsView(b.dataset.view)));
+function renderStatsLevel() {
+  $$("#st-level .nb-chip").forEach((c) => c.classList.toggle("is-sel", Number(c.dataset.lv) === statsLevel));
+  $("#st-level-desc").textContent = STAT_LEVELS[statsLevel].desc;
+}
+$$("#st-level .nb-chip").forEach((c) => c.addEventListener("click", () => {
+  statsLevel = Number(c.dataset.lv);
+  setStatsLevel(statsLevel);
+  try { localStorage.setItem(STATS_LEVEL_KEY, String(statsLevel)); } catch (_) { /* tryb prywatny */ }
+  renderStatsList();
+}));
+
+function renderStatsLabs() {
+  const ul = $("#stats-labs");
+  ul.innerHTML = "";
+  STAT_LABS.forEach((l) => {
+    const li = document.createElement("li");
+    li.appendChild(libCard({ kind: "file", icon: l.icon, name: l.title, sub: l.sub, onOpen: () => openLab(l) }));
+    ul.appendChild(li);
+  });
+}
+function openLab(lab) {
+  $("#lab-title").textContent = lab.title;
+  const body = $("#lab-body");
+  body.innerHTML = "";
+  lab.mount(body);
+  showScreen("screen-lab");
+}
+$("#btn-lab-quit").addEventListener("click", () => { $("#lab-body").innerHTML = ""; showScreen("screen-library"); });
+
 function renderStatsList() {
+  renderStatsLevel();
   const ul = $("#stats-list");
   ul.innerHTML = "";
   const best = readLocal(STATS_BEST_KEY);
-  const rec = (id) => (best[id] ? ` · najlepiej ${best[id].ok}/${best[id].total} za 1. razem` : "");
+  const key = (id) => id + ":" + statsLevel;
+  const rec = (id) => (best[key(id)] ? ` · najlepiej ${best[key(id)].ok}/${best[key(id)].total} za 1. razem` : "");
   const add = (o) => { const li = document.createElement("li"); li.appendChild(libCard(o)); ul.appendChild(li); };
   const missed = Object.keys(readLocal(STATS_MISTAKES_KEY)).map(genById).filter(Boolean);
   if (missed.length) {
@@ -1699,7 +1759,7 @@ function startStats(id, title, gens) {
     queue: gens.map((gen) => ({ gen, inst: gen.make(used), tries: 0 })),
     phase: "answer", sel: null, hinted: false,
   };
-  $("#st-title").textContent = title;
+  $("#st-title").textContent = title + " · " + STAT_LEVELS[statsLevel].name;
   showScreen("screen-stats");
   showStatsTask();
 }
@@ -1752,10 +1812,13 @@ function showStatsTask() {
   });
 
   $("#st-card").classList.toggle("choices-first", !!(t.fields && t.choices));
-  $("#st-hint").classList.add("hidden");
+  // Start: podpowiedź widać od razu (nie odbiera punktu); Ekspert: bez podpowiedzi.
+  $("#st-hint").innerHTML = `💡 ${t.hint}`;
+  $("#st-hint").classList.toggle("hidden", statsLevel !== 1);
   $("#st-fb").classList.add("hidden");
   $("#btn-st-hint").disabled = false;
   ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check"].forEach((sel) => $(sel).classList.remove("hidden"));
+  $("#btn-st-hint").classList.toggle("hidden", statsLevel !== 2);
   $("#btn-st-check").classList.toggle("hidden", !t.fields);
   $("#btn-st-next").classList.add("hidden");
   window.scrollTo({ top: 0 });
@@ -1823,6 +1886,7 @@ function checkStats(giveUp = false) {
     : `<p class="st-verdict">${giveUp ? "Rozwiązanie" : "✗ Nie tym razem"} — to zadanie wróci z nowymi liczbami.</p>` +
       notes.map((n) => `<p class="st-note">💡 ${n}</p>`).join("") + `<div class="st-why">${t.why}</div>`;
   ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check"].forEach((sel) => $(sel).classList.add("hidden"));
+  $("#st-hint").classList.add("hidden");
   $("#btn-st-next").classList.remove("hidden");
   $("#btn-st-next").textContent = s.queue.length ? "Dalej" : "Zakończ";
   updateStatsBar();
@@ -1849,8 +1913,8 @@ function finishStats() {
   ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check", "#btn-st-next"].forEach((sel) => $(sel).classList.add("hidden"));
   $("#st-kind").textContent = "";
   if (s.id !== "review") {
-    const best = readLocal(STATS_BEST_KEY);
-    if (!best[s.id] || best[s.id].ok < s.firstOk) { best[s.id] = { ok: s.firstOk, total: s.total }; writeLocal(STATS_BEST_KEY, best); }
+    const best = readLocal(STATS_BEST_KEY), key = s.id + ":" + statsLevel;
+    if (!best[key] || best[key].ok < s.firstOk) { best[key] = { ok: s.firstOk, total: s.total }; writeLocal(STATS_BEST_KEY, best); }
   }
   const end = $("#st-end");
   end.classList.remove("hidden");
