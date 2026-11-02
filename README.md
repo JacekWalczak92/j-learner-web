@@ -19,6 +19,8 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
     (pokaż odpowiedź → Powtórz / Trudne / Dobre / Łatwe);
   - fiszki: **Nauka** (przerabiasz całość, karta wraca aż „Łatwe") i **Przegląd**
     (szybka powtórka — „Dobre" lub „Łatwe" kończy kartę).
+- **Dysk Google** — przycisk „📁 Dysk Google” w górnym pasku (po zalogowaniu) otwiera
+  folder z materiałami autora na Google Drive.
 - **Audio** — zakładka z nagraniami MP3 wysłanymi z aplikacji mobilnej (AI Lab →
   „Wyślij MP3 do J-Learner web”): lista pogrupowana w foldery, odtwarzacz z tempem
   0.8–2×, automatycznie gra kolejny plik (np. następny rozdział), pobieranie i usuwanie.
@@ -26,6 +28,11 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   konta autora (tabela `app_authors`) widzą wszyscy zalogowani w sekcjach „Od autora · …”
   (odsłuch i pobieranie, bez usuwania). Wymaga uruchomienia aktualnego `supabase/schema.sql`
   (sekcja AUDIO) i dopisania swojego konta do `app_authors` (polecenie w komentarzu tam).
+  Przełącznik **MP3 / TXT · ElevenReader**: w widoku TXT są teksty wysłane z aplikacji
+  (AI Lab → „Wyślij TXT do J-Learner web”, przy podsumowaniu słownym i notatce) z instrukcją,
+  jak słuchać ich w ElevenReaderze. Przy każdym pliku: podgląd, Udostępnij (na telefonie —
+  prosto do ElevenReadera), Kopiuj tekst, Pobierz .txt, Usuń. Treść leży w tabeli
+  `text_files` (sekcja TEKSTY w `supabase/schema.sql`), teksty autora widzą wszyscy zalogowani.
 - **Neuro EN** — nauka angielskich nazw struktur mózgu i neuronu (np. dla psychologów).
   Plansze (własne rysunki SVG): mózg — widok boczny, mózg — przekrój pośrodkowy
   (z hipokampem, korą, pniem i rdzeniem), neuron, synapsa, typy neuronów (kształt i funkcja)

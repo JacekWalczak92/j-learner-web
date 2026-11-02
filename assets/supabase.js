@@ -3,7 +3,7 @@
 //  Eksportuje JLDB. Tokeny trzymane w localStorage (logowanie trwałe).
 // ============================================================================
 
-import { JL_CONFIG } from "./config.js?v=19";
+import { JL_CONFIG } from "./config.js?v=21";
 
 const CFG = JL_CONFIG || {};
 const SB_URL = (CFG.supabaseUrl || "").replace(/\/+$/, "");
@@ -336,6 +336,20 @@ async function deleteAudio(item) {
   return rest("/audio_files?id=eq." + encodeURIComponent(item.id), { method: "DELETE" });
 }
 
+// ── Teksty (TXT z aplikacji mobilnej dla ElevenReadera: tabela text_files) ──
+/** Lista bez treści (treść pobieramy dopiero przy otwarciu/kopiowaniu). */
+function listTexts() {
+  return rest("/text_files?select=id,user_id,title,folder,size_chars,created_at,updated_at&order=folder.asc,title.asc");
+}
+async function getTextContent(id) {
+  const rows = await rest("/text_files?select=content&id=eq." + encodeURIComponent(id));
+  if (!rows || !rows.length) throw new Error("Nie znaleziono pliku tekstowego.");
+  return rows[0].content || "";
+}
+function deleteText(id) {
+  return rest("/text_files?id=eq." + encodeURIComponent(id), { method: "DELETE" });
+}
+
 export const JLDB = {
   isConfigured,
   setSessionExpiredHandler,
@@ -363,4 +377,7 @@ export const JLDB = {
   listAudio,
   audioUrl,
   deleteAudio,
+  listTexts,
+  getTextContent,
+  deleteText,
 };
