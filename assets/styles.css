@@ -225,6 +225,7 @@ button:disabled { -webkit-text-fill-color: currentColor; }
   white-space: nowrap;
 }
 
+.drive-links { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 1 auto; justify-content: flex-end; }
 /* Link do folderu autora na Dysku Google — w pasku, widoczny na każdym ekranie. */
 .btn.drive-link {
   flex: 0 0 auto;
