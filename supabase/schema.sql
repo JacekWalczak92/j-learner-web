@@ -228,9 +228,10 @@ create policy "text_files_update_own" on public.text_files for update using (aut
 create policy "text_files_delete_own" on public.text_files for delete using (auth.uid() = user_id);
 
 -- ════════════════════════════════════════════════════════════════════════════
---  Admin: usuwanie „Od autora”
---  Konto z app_authors może usuwać z poziomu strony: publiczne materiały (is_public),
---  nagrania (wiersz + plik w Storage) i teksty dowolnego konta autora.
+--  Admin: »Od autora«
+--  Konto z app_authors może z poziomu strony dodawać, edytować i usuwać publiczne
+--  materiały (is_public) oraz usuwać nagrania (wiersz + plik w Storage) i teksty
+--  dowolnego konta autora.
 --  Wymaga app_authors / is_author() z sekcji wyżej. Idempotentne.
 -- ════════════════════════════════════════════════════════════════════════════
 drop policy if exists "materials_delete_public_by_author" on public.materials;
@@ -250,3 +251,14 @@ create policy "audio_objects_delete_by_author" on storage.objects for delete to 
 drop policy if exists "text_files_delete_by_author" on public.text_files;
 create policy "text_files_delete_by_author" on public.text_files
   for delete to authenticated using (public.is_author(auth.uid()) and public.is_author(user_id));
+
+-- Tworzenie i edycja materiałów „Od autora” wprost na stronie (admin = konto z app_authors).
+drop policy if exists "materials_insert_public_by_author" on public.materials;
+create policy "materials_insert_public_by_author" on public.materials
+  for insert to authenticated
+  with check (auth.uid() = user_id and is_public = true and public.is_author(auth.uid()));
+drop policy if exists "materials_update_public_by_author" on public.materials;
+create policy "materials_update_public_by_author" on public.materials
+  for update to authenticated
+  using (is_public = true and public.is_author(auth.uid()))
+  with check (is_public = true and public.is_author(auth.uid()) and public.is_author(user_id));
