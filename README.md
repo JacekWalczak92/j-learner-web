@@ -12,7 +12,9 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
 - **Foldery materiałów** — folder wybierasz **w edytorze** (pole „Folder”) przy tworzeniu i edycji materiału, albo szybko przyciskiem **↪** w wierszu materiału. Wybór „góra sekcji” = materiał poza folderem (usunięcie z folderu). Przenosić można tylko w obrębie tej samej sekcji (Fiszki / Testy ABCD).
   domyślne foldery: **Testy ABCD** i **Fiszki**.
 - **Od autora** — publiczne materiały, które publikujesz; każdy może je otworzyć lub
-  „skopiować do moich".
+  „skopiować do moich". Konto admina (z tabeli `app_authors`) ma w menu **⋯** przycisk
+  **„✕ Usuń z „Od autora””** (z potwierdzeniem); to samo dotyczy nagrań i tekstów
+  „Od autora · …” w zakładce Audio. Wymaga sekcji „Admin: usuwanie »Od autora«” z `supabase/schema.sql`.
 - **Tryby nauki** (jak w aplikacji mobilnej) — wybierane przy starcie materiału:
   - testy ABCD: **Quiz klasyczny** (ABCD → wpisywanie z pamięci, powtarza aż opanujesz),
     **Sesja testowa** (ABCD, wynik na końcu, powtórka błędnych), **Fiszki**
@@ -26,7 +28,7 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   0.8–2×, automatycznie gra kolejny plik (np. następny rozdział), pobieranie i usuwanie.
   Pliki leżą w prywatnym buckecie Supabase Storage `audio`, każdy widzi swoje, a nagrania
   konta autora (tabela `app_authors`) widzą wszyscy zalogowani w sekcjach „Od autora · …”
-  (odsłuch i pobieranie, bez usuwania). Wymaga uruchomienia aktualnego `supabase/schema.sql`
+  (odsłuch i pobieranie; usuwać może tylko admin). Wymaga uruchomienia aktualnego `supabase/schema.sql`
   (sekcja AUDIO) i dopisania swojego konta do `app_authors` (polecenie w komentarzu tam).
   Przełącznik **MP3 / TXT · ElevenReader**: w widoku TXT są teksty wysłane z aplikacji
   (AI Lab → „Wyślij TXT do J-Learner web”, przy podsumowaniu słownym i notatce) z instrukcją,

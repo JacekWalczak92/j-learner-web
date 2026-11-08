@@ -61,7 +61,8 @@ Edge Function `publish-material`).
 - `audio_files` — MP3 z aplikacji mobilnej: `title`, `folder`, `path` (klucz w prywatnym
   buckecie Storage `audio`, zawsze `<user_id>/…`), `size_bytes`; upsert po `(user_id, path)`.
   Nagrania kont z `app_authors` (sprawdzane funkcją `is_author()`, security definer) widzą
-  wszyscy zalogowani — w UI sekcje „Od autora · folder”, bez usuwania.
+  wszyscy zalogowani — w UI sekcje „Od autora · folder”; usuwać je (oraz publiczne `materials`) może tylko
+  konto z `app_authors` (`state.isAdmin` z RPC `is_author`, polityki `*_by_author` w schema.sql).
   Odtwarzanie przez podpisany URL (`/storage/v1/object/sign/…`, 1 h); CSP ma `media-src`
   dla Supabase.
 - `text_files` — TXT z aplikacji mobilnej dla ElevenReadera: `title`, `folder`, `content`
@@ -102,7 +103,7 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **23**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **24**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
 2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js`, `neuro.js`, `stats.js` i `stats-lab.js` oraz `APP_VERSION`,
