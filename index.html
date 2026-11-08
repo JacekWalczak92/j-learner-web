@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="assets/styles.css?v=24" />
+  <link rel="stylesheet" href="assets/styles.css?v=25" />
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
@@ -97,6 +97,12 @@
       </div>
 
       <div id="tab-public" class="hidden">
+        <div id="pub-admin-bar" class="lib-bar hidden">
+          <span class="lib-crumbs">Od autora · widzą wszyscy</span>
+          <div class="lib-actions">
+            <button id="btn-new-public" class="btn btn-primary btn-sm" type="button">+ Materiał</button>
+          </div>
+        </div>
         <div class="lib-tools">
           <input id="pub-search" class="text-input lib-search" type="search" placeholder="Szukaj materiałów od autora…" aria-label="Szukaj materiałów publicznych" />
         </div>
@@ -376,9 +382,10 @@
           <option value="flashcards">Fiszki</option>
         </select>
       </label>
-      <label class="field"><span>Folder</span>
+      <label id="ed-folder-field" class="field"><span>Folder</span>
         <select id="ed-folder" class="text-input"></select>
       </label>
+      <p id="ed-public-note" class="modal-sub hidden">Materiał trafi do „Od autora” — zobaczą go wszyscy użytkownicy (nie pojawi się w „Moich materiałach”).</p>
       <label class="field"><span>Treść</span>
         <textarea id="ed-content" class="paste-area" spellcheck="false"
           placeholder="Test: Q:/A:/B:/C:/D:/CORRECT:  •  Fiszki: przód;tył"></textarea>
@@ -530,6 +537,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=24"></script>
+  <script type="module" src="assets/app.js?v=25"></script>
 </body>
 </html>

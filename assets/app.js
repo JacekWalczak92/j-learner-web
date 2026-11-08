@@ -8,13 +8,13 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=24";
-import { JLDB as DB } from "./supabase.js?v=24";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=24";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=24";
-import { STAT_LABS } from "./stats-lab.js?v=24";
+import { JLParsers as JLP } from "./parsers.js?v=25";
+import { JLDB as DB } from "./supabase.js?v=25";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=25";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=25";
+import { STAT_LABS } from "./stats-lab.js?v=25";
 
-const APP_VERSION = "24";
+const APP_VERSION = "25";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -453,6 +453,7 @@ async function loadPublic() {
 }
 
 function renderPublic(allMaterials) {
+  $("#pub-admin-bar").classList.toggle("hidden", !state.isAdmin);
   const query = state.pub.query;
   const materials = allMaterials.filter((m) => matchesQuery(m.title, query));
   const list = $("#pub-list");
@@ -467,6 +468,7 @@ function renderPublic(allMaterials) {
         kind: "file", icon: m.type === "test" ? "≡" : "❏", name: m.title, sub,
         onOpen: () => openMaterial(m.id),
         actions: [
+          state.isAdmin && { glyph: "✎", label: "Edytuj", onClick: () => editMaterial(m.id, { isPublic: true }) },
           { glyph: "⤓", label: "Kopiuj do moich", onClick: async (e) => {
             const btn = e && e.currentTarget;
             if (btn) btn.disabled = true; // ochrona przed podwójną kopią
@@ -780,10 +782,10 @@ async function removeText(t, shared) {
   } catch (err) { setLibStatus(shared ? adminDeleteError(err) : err.message, "err"); }
 }
 
-/** Błąd usuwania cudzego wpisu „Od autora” — zwykle brak polityk z supabase/schema.sql. */
+/** Błąd zapisu/usuwania w „Od autora” — zwykle brak polityk z supabase/schema.sql. */
 function adminDeleteError(err) {
   const m = String((err && err.message) || "");
-  return /uprawnie/i.test(m) ? m + " Uruchom w Supabase SQL Editor sekcję „Admin: usuwanie »Od autora«” z supabase/schema.sql." : m;
+  return /uprawnie|row-level security/i.test(m) ? m + " Uruchom w Supabase SQL Editor sekcję „Admin: »Od autora«” z supabase/schema.sql." : m;
 }
 
 /** Podgląd tekstu w modalu + te same akcje co w menu „⋯". */
@@ -2156,6 +2158,7 @@ $("#audio-search").addEventListener("input", (e) => {
   renderAudio(state.audio.items);
 });
 
+$("#btn-new-public").addEventListener("click", () => editMaterial(null, { isPublic: true }));
 $("#btn-new-material").addEventListener("click", () => {
   if (!state.my.category) return setLibStatus("Najpierw wybierz sekcję: Fiszki albo Testy ABCD.", "err");
   editMaterial(null);
@@ -2197,12 +2200,30 @@ window.addEventListener("beforeunload", (e) => {
   if (editorActive && editorDirty) { e.preventDefault(); e.returnValue = ""; }
 });
 
-async function editMaterial(id) {
-  const cat = categoryByKey(state.my.category);
-  state.editing = { id: id, folderId: curFolderId(), categoryKey: state.my.category };
+/** opts.isPublic = materiał „Od autora” (admin): bez folderu i bez sekcji Fiszki/Testy. */
+async function editMaterial(id, opts = {}) {
+  const isPublic = !!opts.isPublic;
+  const cat = isPublic ? null : categoryByKey(state.my.category);
+  state.editing = { id: id, folderId: isPublic ? null : curFolderId(), categoryKey: isPublic ? null : state.my.category, isPublic };
   editorDirty = false;
   setEdStatus("");
-  if (id) {
+  $("#ed-folder-field").classList.toggle("hidden", isPublic);
+  $("#ed-public-note").classList.toggle("hidden", !isPublic);
+  if (id && isPublic) {
+    $("#editor-title").textContent = "Edytuj materiał · Od autora";
+    try {
+      const m = await DB.getMaterial(id);
+      if (!m) return setLibStatus("Nie znaleziono materiału.", "err");
+      $("#ed-title").value = m.title;
+      $("#ed-type").value = m.type;
+      $("#ed-content").value = m.content;
+    } catch (e) { return setLibStatus(e.message, "err"); }
+  } else if (isPublic) {
+    $("#editor-title").textContent = "Nowy materiał · Od autora";
+    $("#ed-title").value = "";
+    $("#ed-type").value = "auto";
+    $("#ed-content").value = "";
+  } else if (id) {
     $("#editor-title").textContent = "Edytuj materiał";
     try {
       const m = await DB.getMaterial(id);
@@ -2229,8 +2250,9 @@ async function saveMaterial() {
   const title = $("#ed-title").value.trim();
   const content = $("#ed-content").value;
   let type = $("#ed-type").value;
-  const folderId = $("#ed-folder").value || null;
-  const cat = state.editing ? categoryByKey(state.editing.categoryKey) : null;
+  const isPublic = !!(state.editing && state.editing.isPublic);
+  const folderId = isPublic ? null : $("#ed-folder").value || null;
+  const cat = state.editing && !isPublic ? categoryByKey(state.editing.categoryKey) : null;
   if (!title) return setEdStatus("Podaj tytuł.", "err");
   if (!content.trim()) return setEdStatus("Treść jest pusta.", "err");
   // Blob liczy prawdziwe bajty UTF-8 (content.length liczy znaki UTF-16 — polskie
@@ -2249,14 +2271,21 @@ async function saveMaterial() {
   setEdStatus("Zapisuję…");
   $("#btn-ed-save").disabled = true; // ochrona przed podwójnym kliknięciem = duplikatem materiału
   try {
-    if (state.editing.id) await DB.updateMaterial(state.editing.id, { title, type, content, folder_id: folderId });
+    if (isPublic) {
+      const saved = state.editing.id
+        ? await DB.updateMaterial(state.editing.id, { title, type, content })
+        : await DB.createMaterial({ title, type, content, isPublic: true });
+      if (!saved) throw new Error("Brak uprawnień do zapisu w „Od autora” (albo materiał już nie istnieje).");
+    }
+    else if (state.editing.id) await DB.updateMaterial(state.editing.id, { title, type, content, folder_id: folderId });
     else await DB.createMaterial({ title, type, content, folderId });
     setEdStatus("");
     editorDirty = false;
-    state.my._dirty = true;
     showScreen("screen-library");
+    if (isPublic) { switchTab("public"); return; }
+    state.my._dirty = true;
     loadMy();
-  } catch (e) { setEdStatus(e.message, "err"); }
+  } catch (e) { setEdStatus(isPublic ? adminDeleteError(e) : e.message, "err"); }
   finally { $("#btn-ed-save").disabled = false; }
 }
 

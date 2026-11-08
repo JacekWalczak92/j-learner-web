@@ -12,9 +12,12 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
 - **Foldery materiałów** — folder wybierasz **w edytorze** (pole „Folder”) przy tworzeniu i edycji materiału, albo szybko przyciskiem **↪** w wierszu materiału. Wybór „góra sekcji” = materiał poza folderem (usunięcie z folderu). Przenosić można tylko w obrębie tej samej sekcji (Fiszki / Testy ABCD).
   domyślne foldery: **Testy ABCD** i **Fiszki**.
 - **Od autora** — publiczne materiały, które publikujesz; każdy może je otworzyć lub
-  „skopiować do moich". Konto admina (z tabeli `app_authors`) ma w menu **⋯** przycisk
-  **„✕ Usuń z „Od autora””** (z potwierdzeniem); to samo dotyczy nagrań i tekstów
-  „Od autora · …” w zakładce Audio. Wymaga sekcji „Admin: usuwanie »Od autora«” z `supabase/schema.sql`.
+  „skopiować do moich". Konto admina (z tabeli `app_authors`) ma tu przycisk **„+ Materiał”**
+  (wklejanie/tworzenie testów i fiszek wprost do „Od autora”), a w menu **⋯** „✎ Edytuj” i
+  **„✕ Usuń z „Od autora””** (z potwierdzeniem); usuwanie działa też dla nagrań i tekstów
+  „Od autora · …” w zakładce Audio. Sekcje są rozdzielone: materiały „Od autora” nie pojawiają
+  się w „Moich materiałach”, a to, co admin tworzy w „Moich”, zostaje prywatne.
+  Wymaga sekcji „Admin: »Od autora«” z `supabase/schema.sql`.
 - **Tryby nauki** (jak w aplikacji mobilnej) — wybierane przy starcie materiału:
   - testy ABCD: **Quiz klasyczny** (ABCD → wpisywanie z pamięci, powtarza aż opanujesz),
     **Sesja testowa** (ABCD, wynik na końcu, powtórka błędnych), **Fiszki**
