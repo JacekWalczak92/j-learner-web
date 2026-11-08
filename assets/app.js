@@ -8,13 +8,13 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=25";
-import { JLDB as DB } from "./supabase.js?v=25";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=25";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=25";
-import { STAT_LABS } from "./stats-lab.js?v=25";
+import { JLParsers as JLP } from "./parsers.js?v=26";
+import { JLDB as DB } from "./supabase.js?v=26";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=26";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=26";
+import { STAT_LABS } from "./stats-lab.js?v=26";
 
-const APP_VERSION = "25";
+const APP_VERSION = "26";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -29,7 +29,7 @@ const state = {
     query: "", sort: "name",
     lastFolders: [], lastMaterials: [], // ostatnio pobrane dane bieżącego widoku (filtr bez refetch)
   },
-  pub: { items: [], query: "" },
+  pub: { items: [], query: "", section: "main" },
   isAdmin: false, // konto autora (app_authors) — może usuwać materiały, MP3 i TXT „Od autora”
   audio: { items: [], query: "", current: null, queue: [] },
   texts: { items: [], query: "", cache: new Map() }, // TXT dla ElevenReadera (treść w cache po id)
@@ -443,6 +443,42 @@ function renderMy(allFolders, allMaterials) {
   });
 }
 
+// Podzakładki „Od autora”. Egzaminy rozpoznajemy po znaczniku w kolumnie `tags`
+// (bez zmian w bazie); reszta publicznych materiałów to „Materiały”.
+const PUB_SECTIONS = [
+  { key: "main", icon: "📚", name: "Materiały" },
+  { key: "exams", icon: "🎓", name: "Testy i Egzaminy z poprzednich lat" },
+];
+const EXAM_TAG = "egzaminy";
+function tagList(tags) { return String(tags || "").split(/[,\s]+/).filter(Boolean); }
+function pubSectionOf(m) { return tagList(m.tags).includes(EXAM_TAG) ? "exams" : "main"; }
+/** Ustawia/zdejmuje znacznik egzaminów, zachowując pozostałe tagi. */
+function withPubSection(tags, section) {
+  const rest = tagList(tags).filter((t) => t !== EXAM_TAG);
+  if (section === "exams") rest.push(EXAM_TAG);
+  return rest.length ? rest.join(", ") : null;
+}
+
+function renderPubSectionTabs() {
+  const tabs = $("#pub-section-tabs");
+  tabs.innerHTML = "";
+  PUB_SECTIONS.forEach((sec) => {
+    const active = state.pub.section === sec.key;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "category-tab" + (active ? " is-active" : "");
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", active ? "true" : "false");
+    b.innerHTML = `<span class="category-tab-icon">${sec.icon}</span><span>${escapeHtml(sec.name)}</span>`;
+    b.addEventListener("click", () => {
+      if (state.pub.section === sec.key) return;
+      state.pub.section = sec.key;
+      renderPublic(state.pub.items);
+    });
+    tabs.appendChild(b);
+  });
+}
+
 async function loadPublic() {
   setLibStatus("Wczytuję…");
   try {
@@ -454,12 +490,17 @@ async function loadPublic() {
 
 function renderPublic(allMaterials) {
   $("#pub-admin-bar").classList.toggle("hidden", !state.isAdmin);
+  renderPubSectionTabs();
+  const sec = PUB_SECTIONS.find((x) => x.key === state.pub.section) || PUB_SECTIONS[0];
+  $("#pub-admin-bar .lib-crumbs").textContent = sec.name + " · widzą wszyscy";
   const query = state.pub.query;
-  const materials = allMaterials.filter((m) => matchesQuery(m.title, query));
+  const inSection = allMaterials.filter((m) => pubSectionOf(m) === sec.key);
+  const materials = inSection.filter((m) => matchesQuery(m.title, query));
   const list = $("#pub-list");
   list.innerHTML = "";
   const empty = $("#pub-empty");
-  empty.textContent = query && allMaterials.length > 0 ? "Nic nie pasuje do wyszukiwania." : "Brak materiałów od autora.";
+  empty.textContent = query && inSection.length > 0 ? "Nic nie pasuje do wyszukiwania."
+    : sec.key === "exams" ? "Brak testów i egzaminów z poprzednich lat." : "Brak materiałów od autora.";
   empty.classList.toggle("hidden", materials.length > 0);
   materials.forEach((m) => {
       const li = document.createElement("li");
@@ -2192,7 +2233,7 @@ function populateFolderSelect(catKey, selectedId) {
 let editorDirty = false;
 function markEditorDirty() { editorDirty = true; }
 ["#ed-title", "#ed-content"].forEach((sel) => $(sel).addEventListener("input", markEditorDirty));
-["#ed-type", "#ed-folder"].forEach((sel) => $(sel).addEventListener("change", markEditorDirty));
+["#ed-type", "#ed-folder", "#ed-pub-section"].forEach((sel) => $(sel).addEventListener("change", markEditorDirty));
 
 // Ostrzeżenie przeglądarki przy zamykaniu karty z niezapisanym materiałem.
 window.addEventListener("beforeunload", (e) => {
@@ -2209,6 +2250,13 @@ async function editMaterial(id, opts = {}) {
   setEdStatus("");
   $("#ed-folder-field").classList.toggle("hidden", isPublic);
   $("#ed-public-note").classList.toggle("hidden", !isPublic);
+  $("#ed-pub-section-field").classList.toggle("hidden", !isPublic);
+  if (isPublic) {
+    const sel = $("#ed-pub-section");
+    sel.innerHTML = PUB_SECTIONS.map((x) => `<option value="${x.key}">${escapeHtml(x.name)}</option>`).join("");
+    sel.value = state.pub.section;
+    state.editing.tags = null;
+  }
   if (id && isPublic) {
     $("#editor-title").textContent = "Edytuj materiał · Od autora";
     try {
@@ -2217,6 +2265,8 @@ async function editMaterial(id, opts = {}) {
       $("#ed-title").value = m.title;
       $("#ed-type").value = m.type;
       $("#ed-content").value = m.content;
+      state.editing.tags = m.tags || null;
+      $("#ed-pub-section").value = pubSectionOf(m);
     } catch (e) { return setLibStatus(e.message, "err"); }
   } else if (isPublic) {
     $("#editor-title").textContent = "Nowy materiał · Od autora";
@@ -2272,9 +2322,11 @@ async function saveMaterial() {
   $("#btn-ed-save").disabled = true; // ochrona przed podwójnym kliknięciem = duplikatem materiału
   try {
     if (isPublic) {
+      const section = $("#ed-pub-section").value;
+      const tags = withPubSection(state.editing.tags, section);
       const saved = state.editing.id
-        ? await DB.updateMaterial(state.editing.id, { title, type, content })
-        : await DB.createMaterial({ title, type, content, isPublic: true });
+        ? await DB.updateMaterial(state.editing.id, { title, type, content, tags })
+        : await DB.createMaterial({ title, type, content, isPublic: true, tags });
       if (!saved) throw new Error("Brak uprawnień do zapisu w „Od autora” (albo materiał już nie istnieje).");
     }
     else if (state.editing.id) await DB.updateMaterial(state.editing.id, { title, type, content, folder_id: folderId });
@@ -2282,7 +2334,7 @@ async function saveMaterial() {
     setEdStatus("");
     editorDirty = false;
     showScreen("screen-library");
-    if (isPublic) { switchTab("public"); return; }
+    if (isPublic) { state.pub.section = $("#ed-pub-section").value; switchTab("public"); return; }
     state.my._dirty = true;
     loadMy();
   } catch (e) { setEdStatus(isPublic ? adminDeleteError(e) : e.message, "err"); }
