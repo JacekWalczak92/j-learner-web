@@ -3,7 +3,7 @@
 //  Eksportuje JLDB. Tokeny trzymane w localStorage (logowanie trwałe).
 // ============================================================================
 
-import { JL_CONFIG } from "./config.js?v=25";
+import { JL_CONFIG } from "./config.js?v=26";
 
 const CFG = JL_CONFIG || {};
 const SB_URL = (CFG.supabaseUrl || "").replace(/\/+$/, "");
@@ -217,7 +217,7 @@ function listMyMaterials(folderId) {
   return rest(q);
 }
 function listPublicMaterials() {
-  return rest("/materials?select=id,title,type,updated_at&is_public=eq.true&order=updated_at.desc");
+  return rest("/materials?select=id,title,type,tags,updated_at&is_public=eq.true&order=updated_at.desc");
 }
 function getMaterial(id) {
   return rest("/materials?select=*&id=eq." + encodeURIComponent(id)).then((r) =>
@@ -225,11 +225,11 @@ function getMaterial(id) {
   );
 }
 /** isPublic = materiał „Od autora” (tylko admin; RLS wymaga is_author). */
-function createMaterial({ title, type, content, folderId, isPublic = false }) {
+function createMaterial({ title, type, content, folderId, isPublic = false, tags }) {
   return rest("/materials", {
     method: "POST",
     prefer: "return=representation",
-    body: { title, type, content, folder_id: isPublic ? null : folderId || null, is_public: !!isPublic },
+    body: { title, type, content, folder_id: isPublic ? null : folderId || null, is_public: !!isPublic, ...(tags !== undefined ? { tags } : {}) },
   }).then((r) => (Array.isArray(r) ? r[0] : r));
 }
 function updateMaterial(id, patch) {

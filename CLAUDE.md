@@ -58,7 +58,8 @@ Edge Function `publish-material`).
   `content` (surowy tekst w formacie poniżej), `tags`, `is_public`, `updated_at` (trigger). Publiczne czyta każdy;
   zwykły użytkownik nie może ustawić `is_public = true` (blokuje to RLS) — publikacja
   tylko przez `service_role` / Edge Function albo przez konto z `app_authors` (polityki `*_public_by_author`).
-  „Moje materiały” pokazują tylko `is_public = false` (`listMyMaterials`).
+  „Moje materiały” pokazują tylko `is_public = false` (`listMyMaterials`). Podzakładki „Od autora”:
+  `PUB_SECTIONS` (Materiały / Testy i Egzaminy z poprzednich lat) — egzamin = znacznik `egzaminy` w `tags` (`pubSectionOf`, `withPubSection`).
 - `audio_files` — MP3 z aplikacji mobilnej: `title`, `folder`, `path` (klucz w prywatnym
   buckecie Storage `audio`, zawsze `<user_id>/…`), `size_bytes`; upsert po `(user_id, path)`.
   Nagrania kont z `app_authors` (sprawdzane funkcją `is_author()`, security definer) widzą
@@ -104,7 +105,7 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **25**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **26**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
 2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js`, `neuro.js`, `stats.js` i `stats-lab.js` oraz `APP_VERSION`,

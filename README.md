@@ -18,6 +18,9 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   „Od autora · …” w zakładce Audio. Sekcje są rozdzielone: materiały „Od autora” nie pojawiają
   się w „Moich materiałach”, a to, co admin tworzy w „Moich”, zostaje prywatne.
   Wymaga sekcji „Admin: »Od autora«” z `supabase/schema.sql`.
+  „Od autora” ma dwie podzakładki: **Materiały** i **Testy i Egzaminy z poprzednich lat**;
+  admin wybiera zakładkę w edytorze (pole „Zakładka w »Od autora«”) i może przenosić materiał
+  edycją. Egzaminy rozpoznaje znacznik `egzaminy` w kolumnie `tags`.
 - **Tryby nauki** (jak w aplikacji mobilnej) — wybierane przy starcie materiału:
   - testy ABCD: **Quiz klasyczny** (ABCD → wpisywanie z pamięci, powtarza aż opanujesz),
     **Sesja testowa** (ABCD, wynik na końcu, powtórka błędnych), **Fiszki**

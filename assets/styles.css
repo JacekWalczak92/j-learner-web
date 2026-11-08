@@ -554,6 +554,9 @@ select.text-input {
 .source-ico { font-size: 1.05rem; opacity: 0.88; }
 .source-panel { margin-bottom: 8px; }
 
+/* ── Podzakładki „Od autora”: długie nazwy zawijają się zamiast ucinać ── */
+.pub-section-tabs .category-tab { white-space: normal; text-align: center; line-height: 1.2; padding: 6px 10px; }
+
 /* ── Typ materiałów: Fiszki / Testy ABCD ─────────────────────────────────── */
 .category-tabs {
   width: 100%;

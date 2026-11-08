@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
-  <link rel="stylesheet" href="assets/styles.css?v=25" />
+  <link rel="stylesheet" href="assets/styles.css?v=26" />
 </head>
 <body>
   <a class="skip-link" href="#main">Przejdź do treści</a>
@@ -97,6 +97,7 @@
       </div>
 
       <div id="tab-public" class="hidden">
+        <div id="pub-section-tabs" class="category-tabs pub-section-tabs" role="tablist" aria-label="Podzakładki „Od autora”"></div>
         <div id="pub-admin-bar" class="lib-bar hidden">
           <span class="lib-crumbs">Od autora · widzą wszyscy</span>
           <div class="lib-actions">
@@ -385,6 +386,9 @@
       <label id="ed-folder-field" class="field"><span>Folder</span>
         <select id="ed-folder" class="text-input"></select>
       </label>
+      <label id="ed-pub-section-field" class="field hidden"><span>Zakładka w „Od autora”</span>
+        <select id="ed-pub-section" class="text-input"></select>
+      </label>
       <p id="ed-public-note" class="modal-sub hidden">Materiał trafi do „Od autora” — zobaczą go wszyscy użytkownicy (nie pojawi się w „Moich materiałach”).</p>
       <label class="field"><span>Treść</span>
         <textarea id="ed-content" class="paste-area" spellcheck="false"
@@ -537,6 +541,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=25"></script>
+  <script type="module" src="assets/app.js?v=26"></script>
 </body>
 </html>
