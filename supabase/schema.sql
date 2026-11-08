@@ -226,3 +226,27 @@ create policy "text_files_select_own_or_author" on public.text_files
 create policy "text_files_insert_own" on public.text_files for insert with check (auth.uid() = user_id);
 create policy "text_files_update_own" on public.text_files for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "text_files_delete_own" on public.text_files for delete using (auth.uid() = user_id);
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  Admin: usuwanie „Od autora”
+--  Konto z app_authors może usuwać z poziomu strony: publiczne materiały (is_public),
+--  nagrania (wiersz + plik w Storage) i teksty dowolnego konta autora.
+--  Wymaga app_authors / is_author() z sekcji wyżej. Idempotentne.
+-- ════════════════════════════════════════════════════════════════════════════
+drop policy if exists "materials_delete_public_by_author" on public.materials;
+create policy "materials_delete_public_by_author" on public.materials
+  for delete to authenticated using (is_public = true and public.is_author(auth.uid()));
+
+drop policy if exists "audio_files_delete_by_author" on public.audio_files;
+create policy "audio_files_delete_by_author" on public.audio_files
+  for delete to authenticated using (public.is_author(auth.uid()) and public.is_author(user_id));
+
+drop policy if exists "audio_objects_delete_by_author" on storage.objects;
+create policy "audio_objects_delete_by_author" on storage.objects for delete to authenticated
+  using (bucket_id = 'audio' and public.is_author(auth.uid()) and exists (
+    select 1 from public.audio_files f
+    where f.path = storage.objects.name and public.is_author(f.user_id)));
+
+drop policy if exists "text_files_delete_by_author" on public.text_files;
+create policy "text_files_delete_by_author" on public.text_files
+  for delete to authenticated using (public.is_author(auth.uid()) and public.is_author(user_id));

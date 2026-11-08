@@ -3,7 +3,7 @@
 //  Eksportuje JLDB. Tokeny trzymane w localStorage (logowanie trwałe).
 // ============================================================================
 
-import { JL_CONFIG } from "./config.js?v=23";
+import { JL_CONFIG } from "./config.js?v=24";
 
 const CFG = JL_CONFIG || {};
 const SB_URL = (CFG.supabaseUrl || "").replace(/\/+$/, "");
@@ -112,7 +112,7 @@ async function rest(path, { method = "GET", body, prefer, keepalive = false } = 
     const data = await resp.json().catch(() => ({}));
     throw new Error(data.message || data.hint || "Błąd bazy (" + resp.status + ").");
   }
-  if (method === "DELETE" || resp.status === 204) return null;
+  if ((method === "DELETE" && !prefer) || resp.status === 204) return null;
   return resp.json().catch(() => null);
 }
 
@@ -238,8 +238,21 @@ function updateMaterial(id, patch) {
     body: patch,
   }).then((r) => (Array.isArray(r) ? r[0] : r));
 }
+/** Usuwa wiersz i sprawdza, że RLS faktycznie na to pozwolił (inaczej DELETE „udaje” sukces). */
+async function deleteChecked(path) {
+  const rows = await rest(path, { method: "DELETE", prefer: "return=representation" });
+  if (!Array.isArray(rows) || !rows.length) throw new Error("Brak uprawnień do usunięcia (albo już usunięte).");
+  return rows;
+}
 function deleteMaterial(id) {
-  return rest("/materials?id=eq." + encodeURIComponent(id), { method: "DELETE" });
+  return deleteChecked("/materials?id=eq." + encodeURIComponent(id));
+}
+/** Czy zalogowane konto jest kontem autora (tabela app_authors) — admin „Od autora”. */
+async function isAuthor() {
+  const uid = getUserId();
+  if (!uid) return false;
+  try { return (await rest("/rpc/is_author", { method: "POST", body: { uid } })) === true; }
+  catch (_) { return false; }
 }
 /** Przenosi materiał do folderu (folderId=null → poza folder / korzeń). */
 function moveMaterial(id, folderId) {
@@ -332,8 +345,9 @@ async function audioUrl(path, download) {
   return url;
 }
 async function deleteAudio(item) {
+  // Najpierw plik (polityka Storage autora sprawdza wiersz w audio_files), potem wiersz.
   await storage("/object/" + AUDIO_BUCKET, { method: "DELETE", body: { prefixes: [item.path] } });
-  return rest("/audio_files?id=eq." + encodeURIComponent(item.id), { method: "DELETE" });
+  return deleteChecked("/audio_files?id=eq." + encodeURIComponent(item.id));
 }
 
 // ── Teksty (TXT z aplikacji mobilnej dla ElevenReadera: tabela text_files) ──
@@ -347,10 +361,11 @@ async function getTextContent(id) {
   return rows[0].content || "";
 }
 function deleteText(id) {
-  return rest("/text_files?id=eq." + encodeURIComponent(id), { method: "DELETE" });
+  return deleteChecked("/text_files?id=eq." + encodeURIComponent(id));
 }
 
 export const JLDB = {
+  isAuthor,
   isConfigured,
   setSessionExpiredHandler,
   requestPasswordReset,

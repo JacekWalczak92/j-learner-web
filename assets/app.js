@@ -8,13 +8,13 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=23";
-import { JLDB as DB } from "./supabase.js?v=23";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=23";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=23";
-import { STAT_LABS } from "./stats-lab.js?v=23";
+import { JLParsers as JLP } from "./parsers.js?v=24";
+import { JLDB as DB } from "./supabase.js?v=24";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=24";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=24";
+import { STAT_LABS } from "./stats-lab.js?v=24";
 
-const APP_VERSION = "23";
+const APP_VERSION = "24";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -30,6 +30,7 @@ const state = {
     lastFolders: [], lastMaterials: [], // ostatnio pobrane dane bieżącego widoku (filtr bez refetch)
   },
   pub: { items: [], query: "" },
+  isAdmin: false, // konto autora (app_authors) — może usuwać materiały, MP3 i TXT „Od autora”
   audio: { items: [], query: "", current: null, queue: [] },
   texts: { items: [], query: "", cache: new Map() }, // TXT dla ElevenReadera (treść w cache po id)
   neuro: { board: null, mode: "type", answers: {}, results: {}, revealed: false, queue: [], busy: false },
@@ -140,6 +141,7 @@ async function enterApp() {
   $("#drive-links").classList.remove("hidden");
   setRootLibraryView();
   state.my._dirty = true;
+  state.isAdmin = await DB.isAuthor();
   showScreen("screen-library");
   await seedDefaultFolders();
   switchTab("mine");
@@ -203,6 +205,7 @@ async function doSignUp() {
 
 function doSignOut() {
   stopAudio();
+  state.isAdmin = false;
   state.texts = { items: [], query: "", cache: new Map() };
   DB.signOut();
   $("#user-box").classList.add("hidden");
@@ -477,6 +480,12 @@ function renderPublic(allMaterials) {
             catch (err) { setLibStatus(err.message, "err"); }
             finally { if (btn) btn.disabled = false; }
           } },
+          state.isAdmin && { glyph: "✕", label: "Usuń z „Od autora”", danger: true, onClick: async () => {
+            const ok = await modalConfirm("Usunąć materiał od autora?", `Materiał „${m.title}" zniknie z „Od autora” u wszystkich użytkowników (razem z ich postępem nauki). Kopie w „Moich materiałach” zostają. Tej operacji nie można cofnąć.`, { danger: true, okLabel: "Usuń" });
+            if (!ok) return;
+            try { await DB.deleteMaterial(m.id); setLibStatus(`Usunięto „${m.title}".`, "ok"); loadPublic(); }
+            catch (err) { setLibStatus(adminDeleteError(err), "err"); }
+          } },
         ],
       });
       li.appendChild(row);
@@ -563,14 +572,16 @@ function renderAudio(allItems) {
               document.body.appendChild(link); link.click(); link.remove();
             } catch (err) { setLibStatus(err.message, "err"); }
           } },
-          !shared && { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
-            const ok = await modalConfirm("Usunąć nagranie?", `Nagranie „${a.title}" zostanie usunięte z J-Learner web.`, { danger: true, okLabel: "Usuń" });
+          (!shared || state.isAdmin) && { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
+            const ok = await modalConfirm("Usunąć nagranie?", shared
+              ? `Nagranie od autora „${a.title}" zniknie u wszystkich użytkowników. Tej operacji nie można cofnąć.`
+              : `Nagranie „${a.title}" zostanie usunięte z J-Learner web.`, { danger: true, okLabel: "Usuń" });
             if (!ok) return;
             try {
               await DB.deleteAudio(a);
               if (state.audio.current && state.audio.current.id === a.id) stopAudio();
               loadAudio();
-            } catch (err) { setLibStatus(err.message, "err"); }
+            } catch (err) { setLibStatus(shared ? adminDeleteError(err) : err.message, "err"); }
           } },
         ],
       });
@@ -748,7 +759,7 @@ function renderTexts(allItems) {
           share && { glyph: "↗", label: "Udostępnij (ElevenReader)", onClick: () => txtAction(t, "share") },
           { glyph: "⧉", label: "Kopiuj tekst", onClick: () => txtAction(t, "copy") },
           { glyph: "⤓", label: "Pobierz .txt", onClick: () => txtAction(t, "download") },
-          !shared && { glyph: "✕", label: "Usuń", danger: true, onClick: () => removeText(t) },
+          (!shared || state.isAdmin) && { glyph: "✕", label: "Usuń", danger: true, onClick: () => removeText(t, shared) },
         ],
       }));
       ul.appendChild(li);
@@ -757,14 +768,22 @@ function renderTexts(allItems) {
   });
 }
 
-async function removeText(t) {
-  const ok = await modalConfirm("Usunąć tekst?", `Plik „${t.title}" zostanie usunięty z J-Learner web.`, { danger: true, okLabel: "Usuń" });
+async function removeText(t, shared) {
+  const ok = await modalConfirm("Usunąć tekst?", shared
+    ? `Tekst od autora „${t.title}" zniknie u wszystkich użytkowników. Tej operacji nie można cofnąć.`
+    : `Plik „${t.title}" zostanie usunięty z J-Learner web.`, { danger: true, okLabel: "Usuń" });
   if (!ok) return;
   try {
     await DB.deleteText(t.id);
     state.texts.cache.delete(t.id);
     loadTexts();
-  } catch (err) { setLibStatus(err.message, "err"); }
+  } catch (err) { setLibStatus(shared ? adminDeleteError(err) : err.message, "err"); }
+}
+
+/** Błąd usuwania cudzego wpisu „Od autora” — zwykle brak polityk z supabase/schema.sql. */
+function adminDeleteError(err) {
+  const m = String((err && err.message) || "");
+  return /uprawnie/i.test(m) ? m + " Uruchom w Supabase SQL Editor sekcję „Admin: usuwanie »Od autora«” z supabase/schema.sql." : m;
 }
 
 /** Podgląd tekstu w modalu + te same akcje co w menu „⋯". */
