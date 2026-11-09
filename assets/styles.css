@@ -2077,3 +2077,17 @@ select.text-input {
 .lab-c-m { color: var(--bad); font-weight: 750; }
 .lab-c-me { color: var(--amber-600); font-weight: 750; }
 .lab-c-mo { color: var(--ok); font-weight: 750; }
+
+/* Ważne linki (rozwijana sekcja nad zakładkami biblioteki) */
+.important-links {
+  margin: 0 0 14px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--elevated);
+  line-height: 1.5;
+}
+.important-links summary { cursor: pointer; font-weight: 800; }
+.important-links ul { margin: 10px 0 2px; padding-left: 1.2em; display: grid; gap: 6px; }
+.important-links a { color: var(--indigo); font-weight: 700; }
+.important-links span { color: var(--muted); }
