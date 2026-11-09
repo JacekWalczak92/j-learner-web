@@ -71,6 +71,10 @@ Edge Function `publish-material`).
   (tekst wprost w tabeli, ≤ 2 mln znaków), `size_chars`; upsert po `(user_id, folder, title)`.
   RLS jak w `audio_files` (swoje + autora). UI: zakładka Audio → przełącznik „TXT · ElevenReader”
   (`showAudioView`, `renderTexts`, lista bez treści, treść pobierana przy otwarciu).
+- `mobile_inbox` — skrzynka „📱 Na telefon”: `(user_id, material_id)` PK, `sent_at`; upsert z web
+  (`sendToPhone`, akcje „Na telefon” / „Wyślij folder na telefon” w `app.js`). Aplikacja mobilna czyta swoje wpisy
+  i pamięta lokalnie, które `sent_at` już pobrała (więc działa na kilku telefonach). RLS: tylko swoje wiersze,
+  materiał musi być widoczny dla użytkownika (własny lub publiczny).
 - `progress` — postęp: `material_id`, `card_key`, `mode`
   (`classic` | `exam` | `flash` | `nauka` | `przeglad`), `passed`, `difficulty`
   (`none`/`easy`/`hard`), `times_shown`; upsert po `(user_id, material_id, card_key, mode)`.
@@ -105,7 +109,7 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **26**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **27**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
 2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js`, `neuro.js`, `stats.js` i `stats-lab.js` oraz `APP_VERSION`,

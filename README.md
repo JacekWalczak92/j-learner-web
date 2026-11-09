@@ -27,6 +27,12 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
     (pokaż odpowiedź → Powtórz / Trudne / Dobre / Łatwe);
   - fiszki: **Nauka** (przerabiasz całość, karta wraca aż „Łatwe") i **Przegląd**
     (szybka powtórka — „Dobre" lub „Łatwe" kończy kartę).
+- **📱 Na telefon** — w menu „⋯” materiału (w „Moich materiałach” i w „Od autora”) oraz
+  folderu („Wyślij folder na telefon”, razem z podfolderami). Materiał trafia do skrzynki
+  (tabela `mobile_inbox`), a aplikacja mobilna J-Learner (zalogowana na to samo konto)
+  pokazuje w zakładkach Fiszki / Testy pasek „Nowe z J-Learner web” z przyciskiem „Pobierz”.
+  Ponowne wysłanie aktualizuje materiał w telefonie (postęp niezmienionych kart zostaje).
+  Wymaga uruchomienia sekcji SKRZYNKA „NA TELEFON” z `supabase/schema.sql`.
 - **Dysk Google** — przyciski „📁 Dysk Jacka” i „📁 Dysk roku” w górnym pasku (po
   zalogowaniu) otwierają foldery na Google Drive: materiały autora i wspólny dysk roku.
 - **Audio** — zakładka z nagraniami MP3 wysłanymi z aplikacji mobilnej (AI Lab →
