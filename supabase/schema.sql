@@ -262,3 +262,35 @@ create policy "materials_update_public_by_author" on public.materials
   for update to authenticated
   using (is_public = true and public.is_author(auth.uid()))
   with check (is_public = true and public.is_author(auth.uid()) and public.is_author(user_id));
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  SKRZYNKA „NA TELEFON”  (web → aplikacja mobilna)
+--  Przycisk „📱 Na telefon” w web dopisuje tu materiał (swój albo „Od autora”).
+--  Aplikacja mobilna czyta wpisy nowsze niż ostatnio widziane na danym telefonie
+--  i importuje materiały do Fiszek / Testów. Idempotentne.
+-- ════════════════════════════════════════════════════════════════════════════
+create table if not exists public.mobile_inbox (
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  material_id uuid not null references public.materials(id) on delete cascade,
+  sent_at     timestamptz not null default now(),
+  primary key (user_id, material_id)
+);
+create index if not exists mobile_inbox_sent_idx on public.mobile_inbox(user_id, sent_at);
+grant select, insert, update, delete on public.mobile_inbox to authenticated;
+alter table public.mobile_inbox enable row level security;
+
+drop policy if exists "mobile_inbox_select_own" on public.mobile_inbox;
+drop policy if exists "mobile_inbox_insert_own" on public.mobile_inbox;
+drop policy if exists "mobile_inbox_update_own" on public.mobile_inbox;
+drop policy if exists "mobile_inbox_delete_own" on public.mobile_inbox;
+create policy "mobile_inbox_select_own" on public.mobile_inbox
+  for select to authenticated using (auth.uid() = user_id);
+-- Wysłać można tylko materiał, który użytkownik widzi (własny albo publiczny).
+create policy "mobile_inbox_insert_own" on public.mobile_inbox
+  for insert to authenticated with check (auth.uid() = user_id
+    and exists (select 1 from public.materials m where m.id = material_id));
+create policy "mobile_inbox_update_own" on public.mobile_inbox
+  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id
+    and exists (select 1 from public.materials m where m.id = material_id));
+create policy "mobile_inbox_delete_own" on public.mobile_inbox
+  for delete to authenticated using (auth.uid() = user_id);

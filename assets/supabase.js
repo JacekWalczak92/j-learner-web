@@ -3,7 +3,7 @@
 //  Eksportuje JLDB. Tokeny trzymane w localStorage (logowanie trwałe).
 // ============================================================================
 
-import { JL_CONFIG } from "./config.js?v=26";
+import { JL_CONFIG } from "./config.js?v=27";
 
 const CFG = JL_CONFIG || {};
 const SB_URL = (CFG.supabaseUrl || "").replace(/\/+$/, "");
@@ -266,6 +266,24 @@ async function copyToMine(id, folderId) {
   return createMaterial({ title: m.title, type: m.type, content: m.content, folderId: folderId || null });
 }
 
+// ── Skrzynka „Na telefon” (tabela mobile_inbox → aplikacja mobilna) ──────────
+/** Dopisuje materiały do skrzynki; ponowne wysłanie odświeża sent_at (telefon pobierze je znowu). */
+function sendToPhone(materialIds) {
+  const uid = getUserId();
+  const now = new Date().toISOString();
+  const rows = [...new Set(materialIds)].map((id) => ({ user_id: uid, material_id: id, sent_at: now }));
+  if (!rows.length) return Promise.resolve(null);
+  return rest("/mobile_inbox?on_conflict=user_id,material_id", {
+    method: "POST",
+    prefer: "resolution=merge-duplicates,return=minimal",
+    body: rows,
+  });
+}
+/** Wszystkie moje (prywatne) materiały — tylko id i folder, do wysyłki całego folderu. */
+function listMyMaterialRefs() {
+  return rest("/materials?select=id,folder_id&is_public=eq.false&user_id=eq." + encodeURIComponent(getUserId()));
+}
+
 // ── Postęp nauki (per materiał / karta / tryb) ───────────────────────────────
 function listProgress(materialId, mode) {
   let q = "/progress?select=card_key,passed,difficulty,times_shown&material_id=eq." + encodeURIComponent(materialId);
@@ -387,6 +405,8 @@ export const JLDB = {
   deleteMaterial,
   moveMaterial,
   copyToMine,
+  sendToPhone,
+  listMyMaterialRefs,
   listProgress,
   upsertProgress,
   resetProgress,

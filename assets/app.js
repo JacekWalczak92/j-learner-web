@@ -8,13 +8,13 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=26";
-import { JLDB as DB } from "./supabase.js?v=26";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=26";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=26";
-import { STAT_LABS } from "./stats-lab.js?v=26";
+import { JLParsers as JLP } from "./parsers.js?v=27";
+import { JLDB as DB } from "./supabase.js?v=27";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=27";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=27";
+import { STAT_LABS } from "./stats-lab.js?v=27";
 
-const APP_VERSION = "26";
+const APP_VERSION = "27";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -409,6 +409,7 @@ function renderMy(allFolders, allMaterials) {
       kind: "folder", icon: "▤", name: f.name, sub: "Folder",
       onOpen: () => { state.my.stack.push({ id: f.id, name: f.name, categoryKey: state.my.category }); loadMy(); },
       actions: [
+        { glyph: "📱", label: "Wyślij folder na telefon", onClick: (e) => sendFolderToPhone(f, e.currentTarget) },
         { glyph: "✕", label: "Usuń folder", danger: true, onClick: async () => {
           const ok = await modalConfirm("Usunąć folder?", `Folder „${f.name}" i cała jego zawartość zostaną usunięte. Tej operacji nie można cofnąć.`, { danger: true, okLabel: "Usuń" });
           if (!ok) return;
@@ -428,6 +429,7 @@ function renderMy(allFolders, allMaterials) {
       kind: "file", icon: m.type === "test" ? "≡" : "❏", name: m.title, sub,
       onOpen: () => openMaterial(m.id),
       actions: [
+        { glyph: "📱", label: "Na telefon", onClick: (e) => sendMaterialsToPhone([m.id], `„${m.title}"`, e.currentTarget) },
         { glyph: "↪", label: "Przenieś", onClick: () => openMovePicker(m) },
         { glyph: "✎", label: "Edytuj", onClick: () => editMaterial(m.id) },
         { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
@@ -441,6 +443,34 @@ function renderMy(allFolders, allMaterials) {
     li.appendChild(row);
     list.appendChild(li);
   });
+}
+
+// ── Wysyłka na telefon (skrzynka mobile_inbox; aplikacja pobiera w Fiszkach / Testach) ──
+async function sendMaterialsToPhone(ids, label, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    if (!ids.length) { setLibStatus("Brak materiałów do wysłania.", "err"); return; }
+    await DB.sendToPhone(ids);
+    setLibStatus(`Wysłano na telefon: ${label}. W aplikacji otwórz Fiszki albo Testy i stuknij „Pobierz”.`, "ok");
+  } catch (err) {
+    const msg = String(err.message || "");
+    setLibStatus(/mobile_inbox/.test(msg)
+      ? "Skrzynka „Na telefon” nie jest jeszcze włączona w bazie (brak tabeli mobile_inbox — trzeba uruchomić SQL)."
+      : msg, "err");
+  } finally { if (btn) btn.disabled = false; }
+}
+/** Wysyła wszystkie materiały z folderu i jego podfolderów. */
+async function sendFolderToPhone(folder, btn) {
+  try {
+    const [folders, refs] = await Promise.all([DB.listFolders(), DB.listMyMaterialRefs()]);
+    const inTree = new Set([folder.id]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      (folders || []).forEach((f) => { if (f.parent_id && inTree.has(f.parent_id) && !inTree.has(f.id)) { inTree.add(f.id); grew = true; } });
+    }
+    const ids = (refs || []).filter((m) => m.folder_id && inTree.has(m.folder_id)).map((m) => m.id);
+    await sendMaterialsToPhone(ids, `folder „${folder.name}" (${ids.length})`, btn);
+  } catch (err) { setLibStatus(err.message, "err"); }
 }
 
 // Podzakładki „Od autora”. Egzaminy rozpoznajemy po znaczniku w kolumnie `tags`
@@ -510,6 +540,7 @@ function renderPublic(allMaterials) {
         onOpen: () => openMaterial(m.id),
         actions: [
           state.isAdmin && { glyph: "✎", label: "Edytuj", onClick: () => editMaterial(m.id, { isPublic: true }) },
+          { glyph: "📱", label: "Na telefon", onClick: (e) => sendMaterialsToPhone([m.id], `„${m.title}"`, e.currentTarget) },
           { glyph: "⤓", label: "Kopiuj do moich", onClick: async (e) => {
             const btn = e && e.currentTarget;
             if (btn) btn.disabled = true; // ochrona przed podwójną kopią
