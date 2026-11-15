@@ -14,7 +14,7 @@
 //  UWAGA przy wydaniu nowej wersji: podbij VERSION razem z ?v= w index.html.
 // ============================================================================
 
-const VERSION = "28";
+const VERSION = "29";
 const CACHE_NAME = "jl-shell-v" + VERSION;
 
 const SHELL = [
@@ -29,6 +29,8 @@ const SHELL = [
   "./assets/stats.js?v=" + VERSION,
   "./assets/stats-lab.js?v=" + VERSION,
   "./assets/config.js?v=" + VERSION,
+  "./assets/fonts/jakarta-latin.woff2",
+  "./assets/fonts/jakarta-latin-ext.woff2",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/apple-touch-icon.png",

@@ -3,7 +3,7 @@
 //  Eksportuje JLDB. Tokeny trzymane w localStorage (logowanie trwałe).
 // ============================================================================
 
-import { JL_CONFIG } from "./config.js?v=28";
+import { JL_CONFIG } from "./config.js?v=29";
 
 const CFG = JL_CONFIG || {};
 const SB_URL = (CFG.supabaseUrl || "").replace(/\/+$/, "");
@@ -133,7 +133,15 @@ async function signUp(email, password) {
   return { user: null, needsConfirm: true };
 }
 
-async function tryRefresh() {
+// Jedno odświeżanie naraz: równoległe zapytania z 401 czekają na ten sam wynik.
+// Dwa odświeżenia tym samym refresh tokenem mogły skończyć się odrzuceniem drugiego i wylogowaniem.
+let _refreshing = null;
+function tryRefresh() {
+  if (!_refreshing) _refreshing = _doRefresh().finally(() => { _refreshing = null; });
+  return _refreshing;
+}
+async function _doRefresh() {
+  if (!session || !session.refresh_token) return false;
   try {
     const data = await authRequest("/token?grant_type=refresh_token", {
       refresh_token: session.refresh_token,

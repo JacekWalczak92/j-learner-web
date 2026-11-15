@@ -8,17 +8,19 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=28";
-import { JLDB as DB } from "./supabase.js?v=28";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=28";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=28";
-import { STAT_LABS } from "./stats-lab.js?v=28";
+import { JLParsers as JLP } from "./parsers.js?v=29";
+import { JLDB as DB } from "./supabase.js?v=29";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=29";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=29";
+import { STAT_LABS } from "./stats-lab.js?v=29";
 
-const APP_VERSION = "28";
+const APP_VERSION = "29";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
+/** Ikona z zestawu SVG w index.html (symbole #i-…). */
+const ico = (name) => `<svg class="ico" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 
 const state = {
   material: null,
@@ -38,8 +40,8 @@ const state = {
 };
 
 const LIB_CATEGORIES = [
-  { key: "flashcards", type: "flashcards", name: "Fiszki", folderName: "Fiszki", icon: "❏", sub: "Foldery i materiały z fiszkami" },
-  { key: "test", type: "test", name: "Testy ABCD", folderName: "Testy ABCD", icon: "≡", sub: "Foldery i materiały z testami ABCD" },
+  { key: "flashcards", type: "flashcards", name: "Fiszki", folderName: "Fiszki", icon: ico("cards"), sub: "Foldery i materiały z fiszkami" },
+  { key: "test", type: "test", name: "Testy ABCD", folderName: "Testy ABCD", icon: ico("test"), sub: "Foldery i materiały z testami ABCD" },
 ];
 const ROOT_STACK = { id: null, name: "Moje materiały" };
 
@@ -102,8 +104,13 @@ DB.setSessionExpiredHandler(() => {
   setAuthStatus("Sesja wygasła — zaloguj się ponownie.", "err");
 });
 
+const FOCUS_SCREENS = new Set(["screen-test", "screen-flash", "screen-neuro", "screen-fill", "screen-stats"]);
 function showScreen(id) {
   $$(".screen").forEach((s) => s.classList.toggle("is-active", s.id === id));
+  // Tryb skupienia: w czasie nauki bez nagłówka, stopki i paska zakładek.
+  document.body.classList.toggle("is-focus", FOCUS_SCREENS.has(id));
+  document.body.dataset.screen = id;
+  closeAccountMenu();
   window.scrollTo({ top: 0 });
 }
 
@@ -137,6 +144,7 @@ function initApp() {
 async function enterApp() {
   const u = DB.getUser();
   $("#user-email").textContent = u ? u.email : "";
+  $("#account-initial").textContent = u && u.email ? u.email[0].toUpperCase() : "?";
   $("#user-box").classList.remove("hidden");
   $("#drive-links").classList.remove("hidden");
   setRootLibraryView();
@@ -204,6 +212,7 @@ async function doSignUp() {
 }
 
 function doSignOut() {
+  closeAccountMenu();
   stopAudio();
   state.isAdmin = false;
   state.texts = { items: [], query: "", cache: new Map() };
@@ -217,6 +226,22 @@ function doSignOut() {
 $("#btn-signin").addEventListener("click", doSignIn);
 $("#btn-signup").addEventListener("click", doSignUp);
 $("#btn-logout").addEventListener("click", doSignOut);
+
+// ── Menu konta (dyski, ważne linki, wylogowanie) ──────────────────────────────
+function closeAccountMenu() {
+  const m = document.getElementById("account-menu");
+  if (!m || m.classList.contains("hidden")) return;
+  m.classList.add("hidden");
+  $("#btn-account").setAttribute("aria-expanded", "false");
+}
+$("#btn-account").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const m = $("#account-menu");
+  const open = m.classList.toggle("hidden") === false;
+  $("#btn-account").setAttribute("aria-expanded", String(open));
+});
+document.addEventListener("click", (e) => { if (!e.target.closest("#user-box")) closeAccountMenu(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAccountMenu(); });
 $("#auth-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") doSignIn(); });
 
 // ── Reset hasła ───────────────────────────────────────────────────────────────
@@ -274,10 +299,19 @@ function initRecoveryFlow() {
 // ════════════════════════════════════════════════════════════════════════════
 //  BIBLIOTEKA
 // ════════════════════════════════════════════════════════════════════════════
-const setLibStatus = makeStatus("#lib-status");
+const _setLibLine = makeStatus("#lib-status");
+/** Wynik akcji (ok/błąd) jako powiadomienie — linia statusu bywała pod długą listą, poza ekranem. */
+function setLibStatus(msg, kind = "") {
+  if (msg && (kind === "ok" || kind === "err")) { _setLibLine(""); showToast(msg, kind); return; }
+  _setLibLine(msg, kind);
+}
 
 function switchTab(tab) {
-  $$('.source-tab[data-tab]').forEach((t) => t.classList.toggle("is-active", t.dataset.tab === tab));
+  document.body.dataset.tab = tab;
+  $$('.source-tab[data-tab]').forEach((t) => {
+    t.classList.toggle("is-active", t.dataset.tab === tab);
+    t.setAttribute("aria-selected", t.dataset.tab === tab ? "true" : "false");
+  });
   $("#tab-mine").classList.toggle("hidden", tab !== "mine");
   $("#tab-public").classList.toggle("hidden", tab !== "public");
   $("#tab-audio").classList.toggle("hidden", tab !== "audio");
@@ -294,7 +328,9 @@ function curFolderId() {
   return state.my.stack[state.my.stack.length - 1].id;
 }
 
+let _loadMySeq = 0;
 async function loadMy() {
+  const seq = ++_loadMySeq; // starsza odpowiedź nie nadpisze nowszego widoku
   setLibStatus("Wczytuję…");
   try {
     if (state.my._dirty) { state.my.folders = (await DB.listFolders()) || []; state.my._dirty = false; }
@@ -322,12 +358,14 @@ async function loadMy() {
       DB.listMyMaterials(parent).then((r) => r || []),
       isCategoryRoot ? DB.listMyMaterials(null).then((r) => r || []) : Promise.resolve([]),
     ]);
+    if (seq !== _loadMySeq) return;
     const materials = directMaterials.concat(legacyRootMaterials).filter((m) => m.type === cat.type);
     state.my.lastFolders = folders;
     state.my.lastMaterials = materials;
     renderMy(folders, materials);
     setLibStatus("");
-  } catch (e) { setLibStatus(e.message, "err"); }
+    renderContinueCard();
+  } catch (e) { if (seq === _loadMySeq) setLibStatus(e.message, "err"); }
 }
 
 function renderMyCrumbs() {
@@ -406,12 +444,12 @@ function renderMy(allFolders, allMaterials) {
   folders.forEach((f) => {
     const li = document.createElement("li");
     const row = libCard({
-      kind: "folder", icon: "▤", name: f.name, sub: "Folder",
+      kind: "folder", icon: ico("folder"), name: f.name, sub: "Folder",
       onOpen: () => { state.my.stack.push({ id: f.id, name: f.name, categoryKey: state.my.category }); loadMy(); },
       actions: [
-        { glyph: "📱", label: "Wyślij folder na telefon", onClick: (e) => sendFolderToPhone(f, e.currentTarget) },
-        { glyph: "✕", label: "Usuń folder", danger: true, onClick: async () => {
-          const ok = await modalConfirm("Usunąć folder?", `Folder „${f.name}" i cała jego zawartość zostaną usunięte. Tej operacji nie można cofnąć.`, { danger: true, okLabel: "Usuń" });
+        { glyph: ico("phone"), label: "Wyślij folder na telefon", onClick: (e) => sendFolderToPhone(f, e.currentTarget) },
+        { glyph: ico("trash"), label: "Usuń folder", danger: true, onClick: async () => {
+          const ok = await modalConfirm("Usunąć folder?", `Folder „${f.name}" i jego podfoldery zostaną usunięte. Materiały z nich nie znikną — trafią na górę sekcji.`, { danger: true, okLabel: "Usuń" });
           if (!ok) return;
           try { await DB.deleteFolder(f.id); state.my._dirty = true; loadMy(); }
           catch (err) { setLibStatus(err.message, "err"); }
@@ -426,13 +464,13 @@ function renderMy(allFolders, allMaterials) {
     const li = document.createElement("li");
     const sub = (m.type === "test" ? "Test ABCD" : "Fiszki") + " · " + fmtDate(m.updated_at);
     const row = libCard({
-      kind: "file", icon: m.type === "test" ? "≡" : "❏", name: m.title, sub,
+      kind: m.type === "test" ? "file" : "cards", icon: ico(m.type === "test" ? "test" : "cards"), name: m.title, sub,
       onOpen: () => openMaterial(m.id),
       actions: [
-        { glyph: "📱", label: "Na telefon", onClick: (e) => sendMaterialsToPhone([m.id], `„${m.title}"`, e.currentTarget) },
-        { glyph: "↪", label: "Przenieś", onClick: () => openMovePicker(m) },
-        { glyph: "✎", label: "Edytuj", onClick: () => editMaterial(m.id) },
-        { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
+        { glyph: ico("phone"), label: "Na telefon", onClick: (e) => sendMaterialsToPhone([m.id], `„${m.title}"`, e.currentTarget) },
+        { glyph: ico("move"), label: "Przenieś", onClick: () => openMovePicker(m) },
+        { glyph: ico("edit"), label: "Edytuj", onClick: () => editMaterial(m.id) },
+        { glyph: ico("trash"), label: "Usuń", danger: true, onClick: async () => {
           const ok = await modalConfirm("Usunąć materiał?", `Materiał „${m.title}" zostanie trwale usunięty razem z postępem nauki.`, { danger: true, okLabel: "Usuń" });
           if (!ok) return;
           try { await DB.deleteMaterial(m.id); loadMy(); }
@@ -476,8 +514,8 @@ async function sendFolderToPhone(folder, btn) {
 // Podzakładki „Od autora”. Egzaminy rozpoznajemy po znaczniku w kolumnie `tags`
 // (bez zmian w bazie); reszta publicznych materiałów to „Materiały”.
 const PUB_SECTIONS = [
-  { key: "main", icon: "📚", name: "Materiały" },
-  { key: "exams", icon: "🎓", name: "Testy i Egzaminy z poprzednich lat" },
+  { key: "main", icon: ico("book"), name: "Materiały" },
+  { key: "exams", icon: ico("cap"), name: "Testy i Egzaminy z poprzednich lat" },
 ];
 const EXAM_TAG = "egzaminy";
 function tagList(tags) { return String(tags || "").split(/[,\s]+/).filter(Boolean); }
@@ -536,12 +574,12 @@ function renderPublic(allMaterials) {
       const li = document.createElement("li");
       const sub = (m.type === "test" ? "Test ABCD" : "Fiszki") + " · " + fmtDate(m.updated_at);
       const row = libCard({
-        kind: "file", icon: m.type === "test" ? "≡" : "❏", name: m.title, sub,
+        kind: m.type === "test" ? "file" : "cards", icon: ico(m.type === "test" ? "test" : "cards"), name: m.title, sub,
         onOpen: () => openMaterial(m.id),
         actions: [
-          state.isAdmin && { glyph: "✎", label: "Edytuj", onClick: () => editMaterial(m.id, { isPublic: true }) },
-          { glyph: "📱", label: "Na telefon", onClick: (e) => sendMaterialsToPhone([m.id], `„${m.title}"`, e.currentTarget) },
-          { glyph: "⤓", label: "Kopiuj do moich", onClick: async (e) => {
+          state.isAdmin && { glyph: ico("edit"), label: "Edytuj", onClick: () => editMaterial(m.id, { isPublic: true }) },
+          { glyph: ico("phone"), label: "Na telefon", onClick: (e) => sendMaterialsToPhone([m.id], `„${m.title}"`, e.currentTarget) },
+          { glyph: ico("download"), label: "Kopiuj do moich", onClick: async (e) => {
             const btn = e && e.currentTarget;
             if (btn) btn.disabled = true; // ochrona przed podwójną kopią
             try {
@@ -554,7 +592,7 @@ function renderPublic(allMaterials) {
             catch (err) { setLibStatus(err.message, "err"); }
             finally { if (btn) btn.disabled = false; }
           } },
-          state.isAdmin && { glyph: "✕", label: "Usuń z „Od autora”", danger: true, onClick: async () => {
+          state.isAdmin && { glyph: ico("trash"), label: "Usuń z „Od autora”", danger: true, onClick: async () => {
             const ok = await modalConfirm("Usunąć materiał od autora?", `Materiał „${m.title}" zniknie z „Od autora” u wszystkich użytkowników (razem z ich postępem nauki). Kopie w „Moich materiałach” zostają. Tej operacji nie można cofnąć.`, { danger: true, okLabel: "Usuń" });
             if (!ok) return;
             try { await DB.deleteMaterial(m.id); setLibStatus(`Usunięto „${m.title}".`, "ok"); loadPublic(); }
@@ -634,11 +672,11 @@ function renderAudio(allItems) {
       const li = document.createElement("li");
       const playing = state.audio.current && state.audio.current.id === a.id;
       const row = libCard({
-        kind: "file", icon: playing ? "▶" : "♪", name: a.title,
+        kind: "file", icon: ico(playing ? "play" : "music"), name: a.title,
         sub: fmtSize(a.size_bytes) + " · " + fmtDate(a.updated_at || a.created_at),
         onOpen: () => playAudio(a),
         actions: [
-          { glyph: "⤓", label: "Pobierz MP3", onClick: async () => {
+          { glyph: ico("download"), label: "Pobierz MP3", onClick: async () => {
             try {
               const url = await DB.audioUrl(a.path, a.title + ".mp3");
               const link = document.createElement("a");
@@ -646,7 +684,7 @@ function renderAudio(allItems) {
               document.body.appendChild(link); link.click(); link.remove();
             } catch (err) { setLibStatus(err.message, "err"); }
           } },
-          (!shared || state.isAdmin) && { glyph: "✕", label: "Usuń", danger: true, onClick: async () => {
+          (!shared || state.isAdmin) && { glyph: ico("trash"), label: "Usuń", danger: true, onClick: async () => {
             const ok = await modalConfirm("Usunąć nagranie?", shared
               ? `Nagranie od autora „${a.title}" zniknie u wszystkich użytkowników. Tej operacji nie można cofnąć.`
               : `Nagranie „${a.title}" zostanie usunięte z J-Learner web.`, { danger: true, okLabel: "Usuń" });
@@ -674,6 +712,7 @@ async function playAudio(item) {
     state.audio.current = item;
     $("#audio-now-title").textContent = (item.folder ? item.folder + " · " : "") + item.title;
     $("#audio-player").classList.remove("hidden");
+    document.body.classList.add("has-player");
     el.src = url;
     el.playbackRate = Number($("#audio-rate").value) || 1;
     renderAudio(state.audio.items);
@@ -688,7 +727,10 @@ function stopAudio() {
   el.load();
   state.audio.current = null;
   $("#audio-player").classList.add("hidden");
+  document.body.classList.remove("has-player");
+  if (state.audio.items.length) renderAudio(state.audio.items);
 }
+$("#audio-close").addEventListener("click", stopAudio);
 
 function playNeighbour(step) {
   const q = state.audio.queue;
@@ -826,14 +868,14 @@ function renderTexts(allItems) {
       const li = document.createElement("li");
       const mins = Math.max(1, Math.round((Number(t.size_chars) || 0) / 900)); // ~150 słów/min
       li.appendChild(libCard({
-        kind: "file", icon: "📄", name: t.title,
+        kind: "file", icon: ico("file"), name: t.title,
         sub: (Number(t.size_chars) || 0).toLocaleString("pl") + " znaków · ok. " + mins + " min · " + fmtDate(t.updated_at || t.created_at),
         onOpen: () => openText(t, shared),
         actions: [
-          share && { glyph: "↗", label: "Udostępnij (ElevenReader)", onClick: () => txtAction(t, "share") },
-          { glyph: "⧉", label: "Kopiuj tekst", onClick: () => txtAction(t, "copy") },
-          { glyph: "⤓", label: "Pobierz .txt", onClick: () => txtAction(t, "download") },
-          (!shared || state.isAdmin) && { glyph: "✕", label: "Usuń", danger: true, onClick: () => removeText(t, shared) },
+          share && { glyph: ico("share"), label: "Udostępnij (ElevenReader)", onClick: () => txtAction(t, "share") },
+          { glyph: ico("copy"), label: "Kopiuj tekst", onClick: () => txtAction(t, "copy") },
+          { glyph: ico("download"), label: "Pobierz .txt", onClick: () => txtAction(t, "download") },
+          (!shared || state.isAdmin) && { glyph: ico("trash"), label: "Usuń", danger: true, onClick: () => removeText(t, shared) },
         ],
       }));
       ul.appendChild(li);
@@ -922,7 +964,7 @@ function libCard(o) {
     toggle.title = "Więcej";
     toggle.setAttribute("aria-label", "Więcej opcji");
     toggle.setAttribute("aria-expanded", "false");
-    toggle.innerHTML = '<span class="lib-expand-ico">⋯</span>';
+    toggle.innerHTML = '<span class="lib-expand-ico">' + ico("more") + "</span>";
     head.appendChild(toggle);
 
     panel = document.createElement("div");
@@ -1007,7 +1049,7 @@ function renderNeuroDecks() {
   neuroVocabDecks().forEach((d) => {
     const li = document.createElement("li");
     li.appendChild(libCard({
-      kind: "file", icon: "❏", name: d.title,
+      kind: "cards", icon: ico("cards"), name: d.title,
       sub: `${d.sub} · ${d.cards.length} ${plural(d.cards.length, "fiszka", "fiszki", "fiszek")}`,
       onOpen: () => openNeuroDeck(d),
     }));
@@ -1035,7 +1077,7 @@ function renderFillList() {
     const rec = best["fill:" + set.id];
     const li = document.createElement("li");
     li.appendChild(libCard({
-      kind: "file", icon: "✍", name: set.title,
+      kind: "file", icon: ico("sentence"), name: set.title,
       sub: `${set.sub} · ${count} luk` + (rec ? ` · najlepszy wynik ${rec.ok}/${rec.total}` : ""),
       onOpen: () => openFillSet(set),
     }));
@@ -1214,7 +1256,7 @@ function renderNeuroList() {
   if (mistakes.length) {
     const li = document.createElement("li");
     li.appendChild(libCard({
-      kind: "folder", icon: "↺", name: "Powtórka błędów",
+      kind: "folder", icon: ico("refresh"), name: "Powtórka błędów",
       sub: `${mistakes.length} ${plStruct(mistakes.length)} z różnych plansz — wpisz angielską nazwę`,
       onOpen: startNeuroReview,
     }));
@@ -1224,7 +1266,7 @@ function renderNeuroList() {
     const rec = best[b.id], recMatch = best[b.id + ":match"], recTrans = best[b.id + ":trans"];
     const li = document.createElement("li");
     li.appendChild(libCard({
-      kind: "file", icon: "✎", name: b.titlePl,
+      kind: "file", icon: ico("board"), name: b.titlePl,
       sub: `${b.title} · ${b.items.length} nazw` +
         (rec ? ` · wpisywanie ${rec.ok}/${rec.total}` : "") +
         (recMatch ? ` · łączenie ${recMatch.ok}/${recMatch.total}` : "") +
@@ -1744,7 +1786,7 @@ $("#btn-nb-quit").addEventListener("click", () => { showScreen("screen-library")
 // ════════════════════════════════════════════════════════════════════════════
 //  PRZEDMIOTY — wybór modułu (Neuro EN, Statystyka); po wejściu w zakładkę zawsze lista modułów
 // ════════════════════════════════════════════════════════════════════════════
-const SUBJECTS = { neuro: "🧠 Neuro EN", stats: "📊 Statystyka" };
+const SUBJECTS = { neuro: "Neuro EN", stats: "Statystyka" };
 function showSubject(id) {
   $("#subj-home").classList.toggle("hidden", !!id);
   $("#subj-bar").classList.toggle("hidden", !id);
@@ -1831,11 +1873,11 @@ function renderStatsList() {
   const add = (o) => { const li = document.createElement("li"); li.appendChild(libCard(o)); ul.appendChild(li); };
   const missed = Object.keys(readLocal(STATS_MISTAKES_KEY)).map(genById).filter(Boolean);
   if (missed.length) {
-    add({ kind: "folder", icon: "↺", name: "Powtórka błędów",
+    add({ kind: "folder", icon: ico("refresh"), name: "Powtórka błędów",
       sub: `${missed.length} ${plural(missed.length, "typ", "typy", "typów")} zadań, w których był błąd — z nowymi liczbami`,
       onOpen: () => startStats("review", "Powtórka błędów", missed) });
   }
-  add({ kind: "folder", icon: "★", name: "Test mieszany",
+  add({ kind: "folder", icon: ico("star"), name: "Test mieszany",
     sub: `${STAT_EXAM_SIZE} losowych zadań ze wszystkich tematów` + rec("exam"),
     onOpen: () => startStats("exam", "Test mieszany", examGens()) });
   STAT_TOPICS.forEach((t) => add({
@@ -2171,7 +2213,7 @@ function openMovePicker(m) {
       if (node.isRoot) label = inSubfolder ? `↩ Usuń z folderu (góra sekcji)` : `${cat.name} (góra sekcji)`;
       else label = node.name;
       b.innerHTML =
-        `<span class="move-ico">${node.isRoot ? "■" : "▤"}</span>` +
+        `<span class="move-ico">${ico(node.isRoot ? "library" : "folder")}</span>` +
         `<span class="move-name">${escapeHtml(label)}</span>` +
         (isCurrent ? `<span class="move-here">tutaj</span>` : "");
       if (!isCurrent) b.addEventListener("click", () => doMove(m, node.id));
@@ -2231,6 +2273,21 @@ $("#audio-search").addEventListener("input", (e) => {
 });
 
 $("#btn-new-public").addEventListener("click", () => editMaterial(null, { isPublic: true }));
+$("#btn-fab").addEventListener("click", () => {
+  const cat = categoryByKey(state.my.category);
+  openModal("Dodaj", (body) => {
+    const opt = (icon, label, sub, btn) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "move-target fab-opt";
+      b.innerHTML = `<span class="move-ico">${ico(icon)}</span><span class="move-name">${escapeHtml(label)}<small>${escapeHtml(sub)}</small></span>`;
+      b.addEventListener("click", () => { closeModal(); $(btn).click(); });
+      body.appendChild(b);
+    };
+    opt("plus", "Nowy materiał", cat ? `w sekcji ${cat.name}` : "test albo fiszki", "#btn-new-material");
+    opt("folder", "Nowy folder", "w bieżącym folderze", "#btn-new-folder");
+  });
+});
 $("#btn-new-material").addEventListener("click", () => {
   if (!state.my.category) return setLibStatus("Najpierw wybierz sekcję: Fiszki albo Testy ABCD.", "err");
   editMaterial(null);
@@ -2403,21 +2460,73 @@ $("#ed-file").addEventListener("change", (e) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  OTWARCIE MATERIAŁU → PODGLĄD/START
 // ════════════════════════════════════════════════════════════════════════════
-async function openMaterial(id) {
+async function openMaterial(id, mode = null) {
   setLibStatus("Otwieram…");
   try {
     const m = await DB.getMaterial(id);
-    if (!m) return setLibStatus("Nie znaleziono materiału.", "err");
+    if (!m) { forgetLastSession(id); return setLibStatus("Nie znaleziono materiału.", "err"); }
     const items = m.type === "test" ? JLP.parseTestText(m.content) : JLP.parseFlashcardText(m.content);
     if (!items.length) return setLibStatus("Materiał jest pusty lub w złym formacie.", "err");
     state.material = { id: m.id, type: m.type, name: m.title, items };
     setLibStatus("");
-    renderReady();
+    renderReady(mode);
     showScreen("screen-ready");
   } catch (e) { setLibStatus(e.message, "err"); }
 }
 
-function renderReady() {
+function lastSessionKey() { return "jl_last_session:" + (DB.getUserId() || ""); }
+function readLastSession() {
+  try { return JSON.parse(localStorage.getItem(lastSessionKey()) || "null"); } catch (_) { return null; }
+}
+function rememberLastSession(mode) {
+  const mat = state.material;
+  if (!mat || !mat.id) return; // talie Neuro EN (bez id) pomijamy
+  const all = mat.type === "test" ? TEST_MODES : FLASH_MODES;
+  const m = all.find((x) => x.key === mode);
+  try {
+    localStorage.setItem(lastSessionKey(), JSON.stringify({ id: mat.id, title: mat.name, type: mat.type, mode, modeLabel: m ? m.label : "", total: mat.items.length, at: Date.now() }));
+  } catch (_) { /* tryb prywatny */ }
+}
+function forgetLastSession(id) {
+  const last = readLastSession();
+  if (last && (!id || last.id === id)) { try { localStorage.removeItem(lastSessionKey()); } catch (_) {} }
+  renderContinueCard();
+}
+
+/** Karta „Kontynuuj” nad biblioteką: ostatni materiał, tryb i ile zaliczone w tym trybie. */
+async function renderContinueCard() {
+  const box = $("#continue-box");
+  if (!box) return;
+  const last = readLastSession();
+  if (!last) { box.innerHTML = ""; return; }
+  const draw = (passed) => {
+    const pct = passed == null || !last.total ? null : Math.min(100, Math.round((passed / last.total) * 100));
+    const left = passed == null ? null : Math.max(0, last.total - passed);
+    const unit = last.type === "test" ? ["pytanie", "pytania", "pytań"] : ["fiszka", "fiszki", "fiszek"];
+    const sub = last.modeLabel + (left == null ? "" : left === 0 ? " · wszystko zaliczone" : ` · zostało ${left} ${plural(left, ...unit)}`);
+    box.innerHTML =
+      `<div class="continue-card"><button type="button" class="continue-main">` +
+      `<span class="continue-ring"><span>${pct == null ? ico(last.type === "test" ? "test" : "cards") : pct + "%"}</span></span>` +
+      `<span class="continue-text"><span class="continue-label">Kontynuuj naukę</span>` +
+      `<span class="continue-title">${escapeHtml(last.title)}</span><span class="continue-sub">${escapeHtml(sub)}</span></span>` +
+      `<span class="continue-go">${ico("chevron")}</span></button>` +
+      `<button type="button" class="continue-hide" aria-label="Ukryj" title="Ukryj">${ico("x")}</button></div>`;
+    // CSP zabrania atrybutu style w HTML — postęp pierścienia ustawiamy przez CSSOM.
+    box.querySelector(".continue-ring").style.setProperty("--p", (pct == null ? 0 : pct) + "%");
+    box.querySelector(".continue-main").addEventListener("click", () => openMaterial(last.id, last.mode));
+    box.querySelector(".continue-hide").addEventListener("click", () => forgetLastSession());
+  };
+  draw(null);
+  if (last.mode === "przeglad") return;
+  try {
+    const rows = await DB.listProgress(last.id, last.mode === "tflash" ? "flash" : last.mode);
+    const cur = readLastSession();
+    if (!cur || cur.id !== last.id || cur.mode !== last.mode) return;
+    draw(new Set((rows || []).filter((r) => r.passed).map((r) => r.card_key)).size);
+  } catch (_) { /* bez liczby — karta i tak działa */ }
+}
+
+function renderReady(preferMode = null) {
   const mat = state.material;
   const isTest = mat.type === "test";
   $("#ready-badge").textContent = isTest ? "TEST ABCD" : "FISZKI";
@@ -2444,7 +2553,8 @@ function renderReady() {
     box.appendChild(b);
   });
   $("#reset-panel").classList.add("hidden");
-  selectMode(modes[0].key, box.firstChild);
+  const idx = Math.max(0, modes.findIndex((m) => m.key === preferMode));
+  selectMode(modes[idx].key, box.children[idx]);
 }
 
 function selectMode(key, tileEl) {
@@ -2501,13 +2611,13 @@ $("#btn-ready-back").addEventListener("click", () => showScreen("screen-library"
 
 // ── Definicje trybów (jak w aplikacji mobilnej) ───────────────────────────────
 const TEST_MODES = [
-  { key: "classic", icon: "🎯", label: "Quiz klasyczny", desc: "ABCD, potem wpisywanie z pamięci. Powtarza, aż opanujesz." },
-  { key: "exam", icon: "📝", label: "Sesja testowa", desc: "Tylko ABCD, wynik na końcu, kolejna sesja = błędne." },
-  { key: "tflash", icon: "🃏", label: "Fiszki", desc: "Pytanie → odpowiedź, oceniasz: Powtórz / Trudne / Dobre / Łatwe." },
+  { key: "classic", icon: ico("target"), label: "Quiz klasyczny", desc: "ABCD, potem wpisywanie z pamięci. Powtarza, aż opanujesz." },
+  { key: "exam", icon: ico("clipboard"), label: "Sesja testowa", desc: "Tylko ABCD, wynik na końcu, kolejna sesja = błędne." },
+  { key: "tflash", icon: ico("cards"), label: "Fiszki", desc: "Pytanie → odpowiedź, oceniasz: Powtórz / Trudne / Dobre / Łatwe." },
 ];
 const FLASH_MODES = [
-  { key: "nauka", icon: "📚", label: "Nauka", desc: "Przerabiasz całość; karta wraca, dopóki nie klikniesz „Łatwe”." },
-  { key: "przeglad", icon: "🔁", label: "Przegląd", desc: "Przeglądasz karty: następna / poprzednia, z odwracaniem. Bez ocen." },
+  { key: "nauka", icon: ico("book"), label: "Nauka", desc: "Przerabiasz całość; karta wraca, dopóki nie klikniesz „Łatwe”." },
+  { key: "przeglad", icon: ico("repeat"), label: "Przegląd", desc: "Przeglądasz karty: następna / poprzednia, z odwracaniem. Bez ocen." },
 ];
 
 const GRADE_CFG = {
@@ -2651,6 +2761,7 @@ async function doReset(mode, label) {
 $("#btn-start").addEventListener("click", () => {
   const mat = state.material;
   if (!mat) return;
+  rememberLastSession(state.mode);
   $("#ready-progress").classList.remove("done");
   const passed = (state.ready && state.ready.passed) || new Set();
   const sq = $("#opt-shuffle-q")?.checked, sa = $("#opt-shuffle-a")?.checked;
@@ -2876,15 +2987,18 @@ function deleteExam() {
 }
 function finishExam() {
   const t = state.test;
-  const wrongKeys = new Set(t.wrong.map((q) => testKey(q)));
-  const passedRows = t.queue.filter((q) => !wrongKeys.has(testKey(q))).map((q) => ({ card_key: testKey(q), passed: true }));
+  // Klucz z oryginalnego pytania (q.key) — testKey(q) po przemieszaniu odpowiedzi wielokrotnego
+  // wyboru dawał inny wynik i zaliczenie zapisywało się pod złym kluczem.
+  const keyOf = (q) => q.key || testKey(q);
+  const wrongKeys = new Set(t.wrong.map(keyOf));
+  const passedRows = t.queue.filter((q) => !wrongKeys.has(keyOf(q))).map((q) => ({ card_key: keyOf(q), passed: true }));
   persistProgress("exam", passedRows);
   const pct = t.total ? Math.round((t.correct / t.total) * 100) : 0;
   const retry = t.wrong.slice();
   showResults({
     pct, title: "Sesja testowa — koniec", line: `${t.correct} / ${t.total} poprawnych odpowiedzi`, color: "var(--indigo)",
     wrong: retry.map((q) => ({ question: q.question, answer: JLP.correctAnswersText(q) })),
-    onRetryWrong: retry.length ? () => startExam(retry.map((q) => ({ question: q.question, answers: q.answers, correctIndex: q.correctIndex, correctIndices: q.correctIndices, explanation: q.explanation })), { shuffleQ: true, shuffleA: true }) : null,
+    onRetryWrong: retry.length ? () => startExam(retry.map((q) => ({ question: q.question, answers: q.answers, correctIndex: q.correctIndex, correctIndices: q.correctIndices, explanation: q.explanation, key: q.key })), { shuffleQ: true, shuffleA: true }) : null,
     onRetryAll: state.restart,
   });
 }
@@ -2949,6 +3063,7 @@ function classicAnswer(i) {
   c.locked = true;
   revealAnswerButtons(q.correctIndices, new Set([i]));
   renderExplanation("test-explain", q.explanation);
+  setClassicEasyHint(q);
   $("#test-rating").classList.remove("hidden");
 }
 function checkClassic() {
@@ -2961,15 +3076,26 @@ function checkClassic() {
   revealAnswerButtons(q.correctIndices, chosen);
   showCheckBtn(false);
   renderExplanation("test-explain", q.explanation);
+  setClassicEasyHint(q);
   $("#test-rating").classList.remove("hidden");
 }
 function classicRate(easy) {
   const c = state.classic;
   const e = c.queue.shift();
-  // Pytania wielokrotnego wyboru zawsze wracają jako ABCD (bez wpisywania z pamięci).
-  e.mode = (easy && !isMultiQ(e.item)) ? "text" : "abcd";
+  // Pytań wielokrotnego wyboru nie da się wpisać z pamięci — „Łatwe” od razu je zalicza
+  // (wcześniej wracały w kółko jako ABCD i sesja nigdy się nie kończyła).
+  if (easy && isMultiQ(e.item)) {
+    c.passed++;
+    persistProgress("classic", [{ card_key: e.item.key || testKey(e.item), passed: true }]);
+    return renderClassic();
+  }
+  e.mode = easy ? "text" : "abcd";
   insertAt(c.queue, 3, e);
   renderClassic();
+}
+/** Podpis pod „Łatwe” zależy od tego, czy pytanie da się potem wpisać z pamięci. */
+function setClassicEasyHint(q) {
+  $("#btn-rate-easy .g-hint").textContent = isMultiQ(q) ? "zaliczam" : "wróci do wpisania";
 }
 function classicTextShow() {
   const e = state.classic.queue[0];
@@ -2982,7 +3108,7 @@ function classicTextShow() {
 function classicTextGrade(kind) {
   const c = state.classic;
   const e = c.queue.shift();
-  if (kind === "pass") { c.passed++; persistProgress("classic", [{ card_key: testKey(e.item), passed: true }]); }
+  if (kind === "pass") { c.passed++; persistProgress("classic", [{ card_key: e.item.key || testKey(e.item), passed: true }]); }
   else { e.mode = kind === "hard" ? "abcd" : "text"; insertAt(c.queue, 3, e); }
   renderClassic();
 }
@@ -3087,7 +3213,7 @@ function renderBrowse() {
   $("#flash-front-text").textContent = c.front;
   $("#flash-back-text").textContent = c.back;
   $("#flash-count").textContent = `${s.idx + 1} / ${s.cards.length}`;
-  $("#flash-known").textContent = "🔁 Przegląd";
+  $("#flash-known").textContent = "Przegląd";
   $("#flash-known").classList.remove("hidden");
   $("#flash-progress").style.width = `${((s.idx + 1) / s.cards.length) * 100}%`;
   $("#flash-controls-front").classList.add("hidden");
@@ -3161,6 +3287,21 @@ function showResults({ pct, title, line, color, wrong, onRetryWrong, onRetryAll 
   showScreen("screen-results");
 }
 $("#btn-results-home").addEventListener("click", () => { showScreen("screen-library"); loadMy(); });
+
+// ── ✕ w pasku sesji = to samo co link „Zakończ i wróć” danego ekranu ──────────
+[["screen-test", "#btn-test-quit"], ["screen-flash", "#btn-flash-quit"], ["screen-neuro", "#btn-nb-quit"],
+ ["screen-fill", "#btn-fill-quit"], ["screen-stats", "#btn-st-quit"]].forEach(([screen, quit]) => {
+  const bar = document.querySelector(`#${screen} .session-bar`);
+  if (!bar) return;
+  const x = document.createElement("button");
+  x.type = "button";
+  x.className = "session-x";
+  x.setAttribute("aria-label", "Zakończ i wróć");
+  x.title = "Zakończ i wróć";
+  x.innerHTML = ico("x");
+  x.addEventListener("click", () => $(quit).click());
+  bar.prepend(x);
+});
 
 // ── Klawiatura ───────────────────────────────────────────────────────────────
 document.addEventListener("keydown", (e) => {
