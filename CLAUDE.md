@@ -41,7 +41,9 @@ Edge Function `publish-material`).
 | `assets/stats.js` | „Statystyka": `STAT_TOPICS` (tematy → listy generatorów), `examGens()`, `parseNum`, `numClose`, `fmt`. Generator = `{ id, topic, title, make(used) }`; `make` losuje dane i zwraca `{ q, fig?, fields?: [{ label, ans, d, traps? }], choices?, correct?, hint, why }` (`d` = miejsca po przecinku: 0 dokładnie, inaczej ±1 na ostatnim; `traps` = typowe błędy → podpowiedź). Pytania pojęciowe: `bankGen`. UI w `app.js` (sekcja STATYSTYKA, ekran `screen-stats`): dobrze rozwiązane znikają, błędne wracają z nowymi liczbami; localStorage `jl_stats_best`, `jl_stats_mistakes`. |
 | `assets/stats-lab.js` | „Statystyka → Laboratorium": `STAT_LABS` = `{ id, title, sub, icon, mount(host) }`; `mount` buduje interaktywny DOM/SVG (suwaki, przeciąganie, symulacje) + wyzwania (`challenges`). Ekran `screen-lab`. Poziom zadań (`STAT_LEVELS`, `setStatsLevel`) w `stats.js`, zapis w localStorage `jl_stats_level`; najlepsze wyniki per poziom (`id:poziom`). |
 | `assets/config.js` | `JL_CONFIG` = `{ supabaseUrl, supabaseAnonKey }`. |
-| `assets/styles.css` | Cały wygląd (~1600 linii). |
+| `assets/styles.css` | Cały wygląd. Od v29 na końcu blok „szata Żywa” — tokeny kolorów (ciemny domyślnie, jasny w `prefers-color-scheme: light`), wypukłe przyciski (`--press`, `--brand-press`), pasek zakładek na dole (≤760 px), tryb skupienia (`body.is-focus`). Kolory tylko przez tokeny. Uwaga: CSP zabrania atrybutu `style="…"` w HTML — dynamiczne wartości ustawiaj przez `el.style.setProperty`. |
+| `assets/fonts/` | Plus Jakarta Sans (woff2, OFL), ładowana lokalnie (`font-src 'self'`). |
+| Ikony | Sprite SVG na początku `<body>` w `index.html` (`<symbol id="i-…">`); w JS helper `ico("nazwa")`. Nie używaj emoji jako ikon interfejsu. |
 | `sw.js` | Service worker: cache shellu (cache-first dla zasobów z `?v=`). |
 | `manifest.webmanifest`, `assets/icons/` | PWA. |
 | `supabase/schema.sql` | Tabele `folders`, `materials`, `progress`, `audio_files`, bucket `audio` + polityki RLS + trigger `touch_updated_at`. Idempotentny — wkleja się go do SQL Editor. |
@@ -109,7 +111,7 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **28**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **29**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
 2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js`, `neuro.js`, `stats.js` i `stats-lab.js` oraz `APP_VERSION`,

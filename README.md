@@ -33,13 +33,20 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   pokazuje w zakładkach Fiszki / Testy pasek „Nowe z J-Learner web” z przyciskiem „Pobierz”.
   Ponowne wysłanie aktualizuje materiał w telefonie (postęp niezmienionych kart zostaje).
   Wymaga uruchomienia sekcji SKRZYNKA „NA TELEFON” z `supabase/schema.sql`.
-- **Dysk Google** — przyciski „📁 Dysk Jacka” i „📁 Dysk roku” w górnym pasku (po
-  zalogowaniu) otwierają foldery na Google Drive: materiały autora i wspólny dysk roku.
-- **Ważne linki** — rozwijana sekcja „🔗 Ważne linki” nad zakładkami biblioteki: Portal studenta,
-  Euczelnia, Plan zajęć i Zasoby online UG (otwierają się w nowej karcie).
+- **Menu konta** — kółko z inicjałem w prawym górnym rogu: e-mail, **Dysk Jacka** i **Dysk roku**
+  (foldery na Google Drive), **Ważne linki** (Portal studenta, Euczelnia, Plan zajęć, Zasoby online UG)
+  i **Wyloguj**.
+- **Wygląd (v29)** — szata „Żywa”: kolorowe karty (foldery turkusowe, testy fioletowe, fiszki
+  bursztynowe), wypukłe przyciski, jeden zestaw ikon SVG, czcionka Plus Jakarta Sans dołączona
+  do strony, motyw jasny i ciemny według ustawień systemu. Na telefonie zakładki są na dole
+  ekranu, a „+” w rogu dodaje materiał albo folder. W czasie nauki (test, fiszki, Neuro EN,
+  Statystyka) działa tryb skupienia: bez nagłówka, z ✕ i przyciskami przy dolnej krawędzi.
+- **Kontynuuj naukę** — nad biblioteką karta z ostatnio rozpoczętą sesją (materiał, tryb,
+  ile zostało do zaliczenia); zapamiętywana lokalnie w przeglądarce.
 - **Audio** — zakładka z nagraniami MP3 wysłanymi z aplikacji mobilnej (AI Lab →
   „Wyślij MP3 do J-Learner web”): lista pogrupowana w foldery, odtwarzacz z tempem
   0.8–2×, automatycznie gra kolejny plik (np. następny rozdział), pobieranie i usuwanie.
+  Odtwarzacz to pasek u dołu ekranu — gra dalej po przejściu do innej zakładki (✕ zatrzymuje).
   Pliki leżą w prywatnym buckecie Supabase Storage `audio`, każdy widzi swoje, a nagrania
   konta autora (tabela `app_authors`) widzą wszyscy zalogowani w sekcjach „Od autora · …”
   (odsłuch i pobieranie; usuwać może tylko admin). Wymaga uruchomienia aktualnego `supabase/schema.sql`
