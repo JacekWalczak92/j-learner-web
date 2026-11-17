@@ -34,7 +34,7 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   Ponowne wysłanie aktualizuje materiał w telefonie (postęp niezmienionych kart zostaje).
   Wymaga uruchomienia sekcji SKRZYNKA „NA TELEFON” z `supabase/schema.sql`.
 - **Menu konta** — kółko z inicjałem w prawym górnym rogu: e-mail, **Dysk Jacka** i **Dysk roku**
-  (foldery na Google Drive), **Ważne linki** (Portal studenta, Euczelnia, Plan zajęć, Ogłoszenia WNS dla zaocznych, Zasoby online UG)
+  (foldery na Google Drive), **Ważne linki** (Portal studenta, Euczelnia, Plan zajęć, Ogłoszenia WNS dla zaocznych, Zasoby online UG), **Terminy sesji** (okno z odliczaniem do najbliższego terminu, paskiem semestru, kolizjami i listą przedmiotów; dane w `assets/sesja.js`)
   i **Wyloguj**.
 - **Wygląd (v29)** — szata „Żywa”: kolorowe karty (foldery turkusowe, testy fioletowe, fiszki
   bursztynowe), wypukłe przyciski, jeden zestaw ikon SVG, czcionka Plus Jakarta Sans dołączona
