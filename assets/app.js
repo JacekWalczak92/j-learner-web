@@ -8,14 +8,14 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=30";
-import { JLDB as DB } from "./supabase.js?v=30";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=30";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=30";
-import { STAT_LABS } from "./stats-lab.js?v=30";
-import { SESJA, sesjaTerms, sesjaCollisions, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=30";
+import { JLParsers as JLP } from "./parsers.js?v=31";
+import { JLDB as DB } from "./supabase.js?v=31";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=31";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=31";
+import { STAT_LABS } from "./stats-lab.js?v=31";
+import { SESJA, sesjaTerms, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=31";
 
-const APP_VERSION = "30";
+const APP_VERSION = "31";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -245,20 +245,15 @@ document.addEventListener("click", (e) => { if (!e.target.closest("#user-box")) 
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAccountMenu(); });
 $("#auth-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") doSignIn(); });
 
-// ── TERMINY SESJI (menu konta → okno z osią czasu; dane w sesja.js) ───────────
-const TERMS_VIEW_KEY = "jl_terms_view";
-const SESJA_COLL = sesjaCollisions();
+// ── TERMINY SESJI (menu konta → okno z tabelą przedmiotów; dane w sesja.js) ───
 const SES_RANGE = (a, b) => sesDate(a, { weekday: false, year: false }) + "–" + sesDate(b, { weekday: false });
+const SES_SHORT = (iso) => { const p = dateParts(iso); return p.day + " " + p.mon; };
 
 /** Najbliższy przyszły termin z datą (bez zadań) albo null. */
 function nextSesjaTerm() {
   return sesjaTerms().filter((t) => t.date && !t.task && daysUntil(t.date) >= 0)
     .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
 }
-const termKind = (what) => what === "egzamin" ? "k-exam" : /zalicz/.test(what) ? "k-pass" : what === "zadanie" ? "k-task" : "k-proj";
-const subjMeta = (s) => `${s.kind} · ${s.ects} ECTS · ${s.hours} godz.`;
-const daysWord = (n) => n === 1 ? "dzień" : "dni";
-const termsWord = (n) => n === 1 ? "termin" : n < 5 ? "terminy" : "terminów";
 
 /** Podpis pod „Terminy sesji” w menu konta + plakietka z liczbą dni. */
 function updateTermsMenu() {
@@ -278,159 +273,39 @@ function updateTermsMenu() {
   }
 }
 
-/** Karta „Najbliższy termin” z odliczaniem. */
-function termsHeroHtml() {
-  const n = nextSesjaTerm();
-  let count, eyebrow, title, lines;
-  if (n) {
-    const d = daysUntil(n.date);
-    const same = SESJA_COLL.get(n.date) || 1;
-    count = d === 0 ? `<b>dziś</b>` : `<b>${d}</b><span>${daysWord(d)}</span>`;
-    eyebrow = "Najbliższy termin";
-    title = n.subject.name;
-    lines = `<span>${escapeHtml(n.what)} · ${sesDate(n.date)}${n.time ? ", " + n.time : ""}</span>` +
-      (n.form ? `<span class="ses-form">${escapeHtml(n.form)}</span>` : "") +
-      (same > 1 ? `<span class="ses-flag">${ico("alert")}tego dnia jeszcze ${same - 1} ${termsWord(same - 1)}</span>` : "");
-  } else {
-    const inMain = daysUntil(SESJA.main[1]) >= 0, inRetake = daysUntil(SESJA.retake[1]) >= 0;
-    const [a, b] = inMain ? SESJA.main : SESJA.retake;
-    const d = daysUntil(a);
-    if (!inMain && !inRetake) {
-      return `<div class="ses-hero is-done"><div class="ses-hero-main"><span class="ses-eyebrow">Sesja</span><strong>Sesja zakończona</strong></div></div>`;
-    }
-    count = d > 0 ? `<b>${d}</b><span>${daysWord(d)}</span>` : `<b>trwa</b>`;
-    eyebrow = inMain ? "Sesja podstawowa" : "Sesja poprawkowa";
-    title = SES_RANGE(a, b);
-    lines = `<span>terminy egzaminów nieustalone — sprawdzaj ogłoszenia WNS</span>`;
-  }
-  return `<div class="ses-hero${n && SESJA_COLL.has(n.date) ? " is-coll" : ""}">` +
-    `<div class="ses-count">${count}</div>` +
-    `<div class="ses-hero-main"><span class="ses-eyebrow">${eyebrow}</span><strong>${escapeHtml(title)}</strong>${lines}</div></div>`;
-}
-
-/** Pasek semestru: zajęcia → sesja → poprawki, kropki terminów i znacznik „dziś”. */
-function termsBarHtml() {
-  const t0 = SESJA.start, span = daysUntil(SESJA.retake[1], parseIso(t0)) + 1;
-  const pos = (iso) => Math.min(100, Math.max(0, (daysUntil(iso, parseIso(t0)) + 0.5) / span * 100)).toFixed(2);
-  const w = (a, b) => ((daysUntil(b, parseIso(a)) + 1) / span * 100).toFixed(2);
-  const dates = [...new Set(sesjaTerms().filter((t) => t.date && !t.task).map((t) => t.date))];
-  const dots = dates.map((d) =>
-    `<i class="ses-dot${SESJA_COLL.has(d) ? " is-coll" : ""}${daysUntil(d) < 0 ? " is-past" : ""}" data-x="${pos(d)}" title="${sesDate(d)}"></i>`).join("");
-  const today = daysUntil(t0) <= 0 && daysUntil(SESJA.retake[1]) >= 0
-    ? `<i class="ses-today" data-x="${pos(isoToday())}"><span>dziś</span></i>` : "";
-  return `<div class="ses-bar">
-    <div class="ses-track" aria-hidden="true">
-      <span class="ses-ph ph-classes" data-w="${w(t0, SESJA.lastClasses)}"></span><span class="ses-ph ph-main" data-w="${w(SESJA.main[0], SESJA.main[1])}"></span><span class="ses-ph ph-retake" data-w="${w(SESJA.retake[0], SESJA.retake[1])}"></span>
-      ${dots}${today}
-    </div>
-    <div class="ses-keys">
-      <div class="ses-key ph-classes"><span>Ostatnie zajęcia</span><b>${sesDate(SESJA.lastClasses)}</b></div>
-      <div class="ses-key ph-main"><span>Sesja podstawowa</span><b>${SES_RANGE(SESJA.main[0], SESJA.main[1])}</b></div>
-      <div class="ses-key ph-retake"><span>Sesja poprawkowa</span><b>${SES_RANGE(SESJA.retake[0], SESJA.retake[1])}</b></div>
-    </div></div>`;
-}
-function parseIso(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
-function isoToday() { const n = new Date(); return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") + "-" + String(n.getDate()).padStart(2, "0"); }
-
-function termsAlertHtml() {
-  const coll = [...SESJA_COLL].filter(([d]) => daysUntil(d) >= 0);
-  if (!coll.length) return "";
-  return `<div class="ses-alert">${ico("alert")}<span><b>Kilka terminów jednego dnia:</b> ` +
-    coll.map(([d, n]) => `${sesDate(d)} (${n} ${termsWord(n)})`).join(", ") + `</span></div>`;
-}
-
-/** Jedna pozycja (karta) terminu na osi czasu. */
-function termItemHtml(t, { withDate = false } = {}) {
-  const when = withDate && t.date ? `<span class="ses-when">${sesDate(t.date)}</span>` : "";
-  return `<div class="ses-item ${termKind(t.what)}">` +
-    `<div class="ses-item-top"><span class="ses-kind">${escapeHtml(t.what)}</span>${t.time ? `<span class="ses-time">${escapeHtml(t.time)}</span>` : ""}${when}</div>` +
-    `<strong>${escapeHtml(t.subject.name)} <span class="ses-sub">${escapeHtml(t.subject.kind)}</span></strong>` +
-    (t.task ? `<span class="ses-form">${escapeHtml(t.task)}, do ${sesDate(t.date, { weekday: false })}</span>` : "") +
-    (t.form ? `<span class="ses-form">${escapeHtml(t.form)}</span>` : "") + `</div>`;
-}
-
-function renderTermsTimeline(host) {
-  const all = sesjaTerms();
-  const future = all.filter((t) => t.date && daysUntil(t.date) >= 0).sort((a, b) => a.date.localeCompare(b.date));
-  const past = all.filter((t) => t.date && daysUntil(t.date) < 0).sort((a, b) => b.date.localeCompare(a.date));
-  const byDay = new Map();
-  for (const t of future) (byDay.get(t.date) || byDay.set(t.date, []).get(t.date)).push(t);
-  let html = "";
-  for (const [d, items] of byDay) {
-    const p = dateParts(d), dd = daysUntil(d), coll = SESJA_COLL.has(d);
-    html += `<section class="ses-day${coll ? " is-coll" : ""}${dd <= 7 ? " is-soon" : ""}">` +
-      `<div class="ses-date"><span>${p.wd}</span><b>${p.day}</b><span>${p.mon}</span></div>` +
-      `<div class="ses-day-main"><div class="ses-day-head"><span>${relDays(dd)}</span>` +
-      (coll ? `<span class="ses-flag">${ico("alert")}kolizja · ${items.length} ${termsWord(items.length)}</span>` : "") +
-      `</div>${items.map((t) => termItemHtml(t)).join("")}</div></section>`;
-  }
-  const sess = all.filter((t) => t.session);
-  if (sess.length && daysUntil(SESJA.main[1]) >= 0) {
-    const d = daysUntil(SESJA.main[0]);
-    html += `<section class="ses-day is-range">` +
-      `<div class="ses-date"><span>sesja</span><b>${dateParts(SESJA.main[0]).day}–${dateParts(SESJA.main[1]).day}</b><span>${dateParts(SESJA.main[0]).mon}</span></div>` +
-      `<div class="ses-day-main"><div class="ses-day-head"><span>${d > 0 ? relDays(d) : "trwa"}</span><span class="ses-flag is-soft">termin nieustalony</span></div>` +
-      `${sess.map((t) => termItemHtml(t)).join("")}</div></section>`;
-  }
-  const tbd = all.filter((t) => t.tbd);
-  if (tbd.length) {
-    html += `<section class="ses-day is-tbd">` +
-      `<div class="ses-date"><b>?</b><span>brak</span></div>` +
-      `<div class="ses-day-main"><div class="ses-day-head"><span class="ses-flag is-warn">brak wpisanego terminu — do ustalenia</span></div>` +
-      `${tbd.map((t) => termItemHtml(t)).join("")}</div></section>`;
-  }
-  if (past.length) {
-    html += `<details class="ses-past"><summary>Minione (${past.length})</summary>${past.map((t) => termItemHtml(t, { withDate: true })).join("")}</details>`;
-  }
-  host.innerHTML = html;
-}
-
-function renderTermsSubjects(host) {
-  const subs = SESJA.subjects;
-  const ects = subs.reduce((a, s) => a + s.ects, 0);
-  const exams = subs.filter((s) => s.credit === "egzamin").length;
-  const line = (t) => {
-    let when;
-    if (t.task) when = `${escapeHtml(t.task)}, do ${sesDate(t.date, { weekday: false })}`;
-    else if (t.date) when = `<b>${sesDate(t.date)}${t.time ? ", " + escapeHtml(t.time) : ""}</b>` +
-      (SESJA_COLL.has(t.date) ? ` <span class="ses-flag">${ico("alert")}kolizja</span>` : "");
-    else if (t.session) when = `<i>w sesji (${SES_RANGE(SESJA.main[0], SESJA.main[1]).replace(/\.\d{4}$/, "")}), termin nieustalony</i>`;
-    else when = `<i class="ses-warn">brak wpisanego terminu — do ustalenia</i>`;
-    const past = t.date && daysUntil(t.date) < 0 ? " is-past" : "";
-    return `<li class="${termKind(t.what)}${past}"><span class="ses-kind">${escapeHtml(t.what)}</span><span class="ses-li-main"><span>${when}</span>` +
-      (t.form ? `<span class="ses-form">${escapeHtml(t.form)}</span>` : "") + `</span></li>`;
-  };
-  host.innerHTML = `<p class="ses-summary">${subs.length} przedmiotów · ${ects} ECTS · ${exams} egzaminów · ${subs.length - exams} zaliczeń z oceną</p>` +
-    subs.map((s) => `<div class="ses-subj">` +
-      `<div class="ses-subj-head"><strong>${escapeHtml(s.name)}</strong><span class="ses-credit ${s.credit === "egzamin" ? "k-exam" : "k-pass"}">${escapeHtml(s.credit)}</span></div>` +
-      `<span class="ses-meta">${escapeHtml(subjMeta(s))}</span><ul>${s.terms.map(line).join("")}</ul></div>`).join("");
+/** Wiersze tabeli: jeden na przedmiot, posortowane — z datą, w sesji, bez terminu, minione. Zadania pomijamy. */
+function sesjaRows() {
+  const names = new Map();
+  for (const s of SESJA.subjects) names.set(s.name, (names.get(s.name) || 0) + 1);
+  const rows = SESJA.subjects.map((s) => {
+    const terms = s.terms.filter((t) => !t.task);
+    const future = terms.filter((t) => t.date && daysUntil(t.date) >= 0).map((t) => t.date).sort();
+    const dated = terms.filter((t) => t.date).map((t) => t.date).sort();
+    const date = future[0] || null;
+    // grupa sortowania: 0 = z datą, 1 = w sesji, 2 = bez terminu, 3 = minęło
+    const group = date ? 0 : terms.some((t) => t.session) ? 1 : terms.some((t) => t.tbd) ? 2 : 3;
+    const oneDay = new Set(dated).size <= 1;
+    const what = terms.map((t) => t.what + (t.date && !oneDay ? " " + SES_SHORT(t.date) : "") + (t.time ? " · " + t.time : "")).join(" + ");
+    const name = s.name + (names.get(s.name) > 1 ? " (" + s.kind + ")" : "");
+    return { name, what, date, group, last: dated[dated.length - 1] };
+  });
+  return rows.sort((a, b) => a.group - b.group || (a.date || "").localeCompare(b.date || "")).filter((r) => r.what);
 }
 
 function openTermsModal() {
   closeAccountMenu();
-  let view = "time";
-  try { if (localStorage.getItem(TERMS_VIEW_KEY) === "subj") view = "subj"; } catch (_) {}
-  openModal("Sesja — " + SESJA.title, (body) => {
-    body.innerHTML = termsHeroHtml() + termsBarHtml() + termsAlertHtml() +
-      `<div class="ses-tabs" role="tablist" aria-label="Widok terminów">` +
-      `<button type="button" role="tab" data-view="time">${ico("calendar")}Oś czasu</button>` +
-      `<button type="button" role="tab" data-view="subj">${ico("book")}Przedmioty</button></div>` +
-      `<div id="ses-list" class="ses-list"></div>` +
-      `<p class="ses-note">${escapeHtml(SESJA.note)} <a href="https://wns.ug.edu.pl/wydzial/instytuty-wns/instytut-psychologii/ogloszenia-dla-studentow-zaocznych" target="_blank" rel="noopener noreferrer">Ogłoszenia WNS</a> · wydruk ${sesDate(SESJA.printed, { weekday: false })}</p>`;
-    body.querySelectorAll("[data-x]").forEach((el) => el.style.setProperty("--x", el.dataset.x + "%"));
-    body.querySelectorAll("[data-w]").forEach((el) => el.style.setProperty("--w", el.dataset.w + "%"));
-    const show = (v) => {
-      view = v;
-      try { localStorage.setItem(TERMS_VIEW_KEY, v); } catch (_) { /* tryb prywatny */ }
-      body.querySelectorAll(".ses-tabs button").forEach((b) => {
-        const on = b.dataset.view === v;
-        b.classList.toggle("is-active", on);
-        b.setAttribute("aria-selected", String(on));
-      });
-      (v === "subj" ? renderTermsSubjects : renderTermsTimeline)(body.querySelector("#ses-list"));
-    };
-    body.querySelectorAll(".ses-tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
-    show(view);
+  openModal("Terminy sesji — " + SESJA.title, (body) => {
+    const rows = sesjaRows();
+    body.innerHTML = `<div class="ses-table">` + rows.map((r) => {
+      const when = r.group === 0 ? SES_SHORT(r.date) : r.group === 1 ? "w sesji" : r.group === 2 ? "brak" : "minął";
+      const soon = r.group === 0 && daysUntil(r.date) <= 7;
+      return `<div class="ses-row${r.group ? " is-muted" : ""}${r.group === 3 ? " is-past" : ""}">` +
+        `<span class="ses-name">${escapeHtml(r.name)}</span>` +
+        `<span class="ses-when${soon ? " is-soon" : ""}">${escapeHtml(when)}</span>` +
+        `<span class="ses-what">${escapeHtml(r.what)}${r.group === 0 ? " · " + relDays(daysUntil(r.date)) : ""}</span></div>`;
+    }).join("") + `</div>` +
+      `<p class="ses-note">Sesja ${SES_RANGE(SESJA.main[0], SESJA.main[1])} · poprawki ${SES_RANGE(SESJA.retake[0], SESJA.retake[1])}. ` +
+      `„W sesji” = dzień jeszcze nieznany. <a href="https://wns.ug.edu.pl/wydzial/instytuty-wns/instytut-psychologii/ogloszenia-dla-studentow-zaocznych" target="_blank" rel="noopener noreferrer">Ogłoszenia WNS</a></p>`;
   }, { cls: "modal-terms" });
 }
 $("#btn-terms").addEventListener("click", openTermsModal);
