@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  Terminy sesji — dane z wydruku „Sesja — Semestr zimowy (III)” (16.11.2026).
-//  Nowy semestr = podmień obiekt SESJA (daty ISO, rrrr-mm-dd). UI w app.js (TERMINY SESJI).
+//  Nowy semestr = podmień obiekt SESJA (daty ISO, rrrr-mm-dd). UI w app.js (TERMINY SESJI, tabela przedmiotów).
 //  Termin: { what, date?, time?, form?, session?: true (w sesji, termin nieustalony),
 //            tbd?: true (brak wpisanego terminu), task?: "treść zadania" }.
 //  Kolizje (≥ 2 terminy jednego dnia) liczy sesjaCollisions().
