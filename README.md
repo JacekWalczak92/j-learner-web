@@ -99,7 +99,12 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   Fiszki / Wszystko*, dla fiszek *Nauka / Przegląd / Wszystko*. (Bez harmonogramu
   spaced repetition — trzymamy tylko „zaliczone”.)
 
-- **Statystyka** — moduł do wykładów 1–2 ze statystyki opisowej (psychologia), w dwóch częściach:
+- **Statystyka** — moduł do statystyki opisowej (psychologia), w trzech częściach:
+  - **Ćwiczenia** (do prezentacji „Podstawy statystyki psychologicznej 2” i listy na kolokwium) — „czy ten
+    wynik jest w ogóle realny?”: dane + wynik „z raportu” (czasem dobry, często absurdalny, np. mediana
+    większa od maksimum, r = 1,3, z dodatnie dla wyniku poniżej średniej). Student wybiera ocenę z
+    uzasadnieniem i dostaje wyjaśnienie, dlaczego jego odpowiedź jest dobra albo zła. 19 zagadnień ×
+    3 ćwiczenia (liczby losowane), sprawdzian mieszany i powtórka błędów.
   - **Laboratorium** — sześć interaktywnych, wizualnych wyjaśnień: Σ jako pętla (suwaki granic,
     liczenie krok po kroku), rozkład liczebności na żywo (klikane wyniki → tabela, histogram,
     przedziały z granicami dokładnymi), huśtawka średnia vs mediana (przeciągane punkty, wynik
@@ -208,6 +213,7 @@ j-learner-web/
 │   ├── neuro.js        # plansze „Neuro EN" (SVG + nazwy + sprawdzanie)
 │   ├── stats.js        # zadania „Statystyka" (generatory z losowanymi danymi)
 │   ├── stats-lab.js    # „Statystyka → Laboratorium" (interaktywne wizualizacje)
+│   ├── stats-sense.js  # „Statystyka → Ćwiczenia" (czy wynik jest realny? + wyjaśnienia)
 │   ├── styles.css      # wygląd
 │   └── app.js          # logika UI i sesji
 ├── supabase/

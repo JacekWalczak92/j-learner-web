@@ -929,3 +929,5 @@ export const STAT_EXAM_SIZE = 14;
 /** Test mieszany: po jednym zadaniu z losowych generatorów, przemieszane. */
 export function examGens() { return shuffle(ALL_GENS).slice(0, STAT_EXAM_SIZE); }
 export { shuffle as shuffleStats };
+/** Pomocniki dla „Ćwiczeń” (stats-sense.js) — te same losowanie, tabele i wykresy. */
+export const statsKit = { ri, pick, shuffle, sum, sorted, median, list, table, steps, histSvg };
