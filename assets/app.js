@@ -8,15 +8,15 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=33";
-import { JLDB as DB } from "./supabase.js?v=33";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=33";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=33";
-import { STAT_LABS } from "./stats-lab.js?v=33";
-import { SENSE_TOPICS, SENSE_MIX_SIZE, senseMixGens, senseGenById } from "./stats-sense.js?v=33";
-import { SESJA, sesjaTerms, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=33";
+import { JLParsers as JLP } from "./parsers.js?v=34";
+import { JLDB as DB } from "./supabase.js?v=34";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=34";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=34";
+import { STAT_LABS } from "./stats-lab.js?v=34";
+import { SENSE_TOPICS, SENSE_MIX_SIZE, senseMixGens, senseGenById } from "./stats-sense.js?v=34";
+import { SESJA, sesjaTerms, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=34";
 
-const APP_VERSION = "33";
+const APP_VERSION = "34";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -114,7 +114,188 @@ function showScreen(id) {
   document.body.dataset.screen = id;
   closeAccountMenu();
   window.scrollTo({ top: 0 });
+  scheduleSync();
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+//  HISTORIA PRZEGLĄDARKI — strzałki wstecz/dalej i gest „wstecz” na telefonie
+// ════════════════════════════════════════════════════════════════════════════
+// Widok biblioteki jest w hashu (#/moje/test/<folder>, #/od-autora/egzaminy,
+// #/audio/txt, #/przedmioty/statystyka/cwiczenia…), więc odświeżenie i link wracają
+// do tego samego miejsca. Nauka (test, fiszki, zadania, laboratorium, edytor) i okna
+// to wpisy „tymczasowe” (jlAct / jlModal): wstecz je zamyka, a wyjście z nich
+// przyciskiem w aplikacji cofa historię, żeby nie zostawał martwy wpis.
+const ACTIVITY_SCREENS = new Set(["screen-editor", "screen-ready", "screen-test", "screen-flash", "screen-results",
+  "screen-neuro", "screen-fill", "screen-stats", "screen-lab"]);
+const NEURO_SLUGS = { boards: "plansze", cards: "fiszki", fill: "zdania" };
+const STATS_SLUGS = { lab: "laboratorium", tasks: "zadania", sense: "cwiczenia" };
+const slugKey = (map, slug) => Object.keys(map).find((k) => map[k] === slug) || null;
+let curSubject = null;   // otwarty moduł w „Przedmiotach” (neuro | stats | null)
+let _navReady = false;   // historia działa dopiero po wejściu do aplikacji
+let _navBusy = false;    // trwa odtwarzanie widoku z historii (np. pobieranie materiału)
+let _navReplace = false; // następna synchronizacja tylko podmienia bieżący wpis
+let _popPending = false; // czekamy na popstate po własnym history.back()
+let _popTimer = 0;
+let _syncTimer = 0;
+try { history.scrollRestoration = "manual"; } catch (_) {}
+
+/** Adres bieżącego widoku (hash). */
+function currentRoute() {
+  const scr = document.body.dataset.screen;
+  if (scr === "screen-ready" && state.material && state.material.id) return "#/material/" + encodeURIComponent(state.material.id);
+  if (scr === "screen-lab" && state.labId) return "#/lab/" + state.labId;
+  if (ACTIVITY_SCREENS.has(scr)) return "#/nauka";
+  const tab = document.body.dataset.tab || "mine";
+  if (tab === "public") return "#/od-autora" + (state.pub.section === "exams" ? "/egzaminy" : "");
+  if (tab === "audio") return "#/audio" + (audioView === "txt" ? "/txt" : "");
+  if (tab === "subjects") {
+    if (curSubject === "neuro") return "#/przedmioty/neuro/" + NEURO_SLUGS[neuroView];
+    if (curSubject === "stats") return "#/przedmioty/statystyka/" + STATS_SLUGS[statsView];
+    return "#/przedmioty";
+  }
+  const cat = state.my.category;
+  if (!cat) return "#/moje";
+  return "#/moje/" + (cat === "test" ? "testy" : "fiszki") + state.my.stack.slice(2).map((f) => "/" + encodeURIComponent(f.id)).join("");
+}
+
+/** Hash → opis widoku. Nieznany hash (np. token z linku e-mail) = domyślna biblioteka. */
+function parseRoute(hash) {
+  const p = String(hash || "").replace(/^#\/?/, "").split("/").filter(Boolean).map((s) => { try { return decodeURIComponent(s); } catch (_) { return s; } });
+  if (!String(hash || "").startsWith("#/")) return { kind: "lib", tab: "mine" };
+  switch (p[0]) {
+    case "material": return p[1] ? { kind: "material", id: p[1] } : { kind: "lib", tab: "mine" };
+    case "lab": return { kind: "lab", id: p[1] };
+    case "nauka": return { kind: "gone" };
+    case "od-autora": return { kind: "lib", tab: "public", section: p[1] === "egzaminy" ? "exams" : "main" };
+    case "audio": return { kind: "lib", tab: "audio", view: p[1] === "txt" ? "txt" : "mp3" };
+    case "przedmioty":
+      if (p[1] === "neuro") return { kind: "lib", tab: "subjects", subj: "neuro", view: slugKey(NEURO_SLUGS, p[2]) || "boards" };
+      if (p[1] === "statystyka") return { kind: "lib", tab: "subjects", subj: "stats", view: slugKey(STATS_SLUGS, p[2]) || "lab" };
+      return { kind: "lib", tab: "subjects" };
+    default:
+      return { kind: "lib", tab: "mine", cat: p[1] === "testy" ? "test" : p[1] === "fiszki" ? "flashcards" : null, folders: p.slice(2) };
+  }
+}
+
+/** Ustawia widok biblioteki z opisu trasy (te same funkcje co kliknięcia). */
+function applyLibRoute(r) {
+  if (document.body.dataset.screen !== "screen-library") showScreen("screen-library");
+  if (r.tab === "mine") {
+    if (r.cat && setCategoryRoot(r.cat)) {
+      for (const id of r.folders || []) {
+        const parent = curFolderId();
+        const f = state.my.folders.find((x) => String(x.id) === id && ((x.parent_id || null) === parent || state.my.stack.length === 2));
+        if (!f) break;
+        state.my.stack.push({ id: f.id, name: f.name, categoryKey: r.cat });
+      }
+    }
+    switchTab("mine");
+  } else if (r.tab === "public") {
+    state.pub.section = r.section || "main";
+    switchTab("public");
+  } else if (r.tab === "audio") {
+    audioView = r.view || audioView;
+    switchTab("audio");
+  } else {
+    switchTab("subjects");
+    if (r.subj === "neuro") { neuroView = r.view; showSubject("neuro"); }
+    else if (r.subj === "stats") { statsView = r.view; showSubject("stats"); }
+  }
+}
+
+/** Wyjście z nauki/edytora przez „wstecz”; false = zostajemy (niezapisane zmiany w edytorze). */
+function leaveActivity() {
+  const scr = document.body.dataset.screen;
+  if (scr === "screen-editor" && editorDirty) {
+    // Przywracamy wpis edytora i pytamy jak przy „Anuluj” — „Zostań” nic nie psuje.
+    history.pushState({ jlAct: 1 }, "", location.pathname + location.search + "#/nauka");
+    $("#btn-ed-cancel").click();
+    return false;
+  }
+  if (scr === "screen-test" || scr === "screen-flash") flushProgress();
+  if (scr === "screen-lab") $("#lab-body").innerHTML = "";
+  return true;
+}
+
+/** Otwiera widok z historii (wstecz/dalej) albo z adresu przy starcie. */
+async function applyRoute(hash, { initial = false } = {}) {
+  const r = parseRoute(hash);
+  const scr = document.body.dataset.screen;
+  if (!initial && ACTIVITY_SCREENS.has(scr) && !leaveActivity()) return;
+  _navBusy = true;
+  try {
+    if (r.kind === "lib") applyLibRoute(r);
+    else {
+      // Pod materiałem/laboratorium zostaje biblioteka, do której wraca „wstecz”.
+      if (initial || ACTIVITY_SCREENS.has(scr)) applyLibRoute({ kind: "lib", tab: "mine" });
+      if (initial) { _navBusy = false; _navReplace = true; syncHistory(); _navBusy = true; }
+      if (r.kind === "material") await openMaterial(r.id);
+      else if (r.kind === "lab" && STAT_LABS.some((l) => l.id === r.id)) openLab(STAT_LABS.find((l) => l.id === r.id));
+    }
+  } finally {
+    _navBusy = false;
+    // Start z linku do materiału: biblioteka już podmieniona, materiał = nowy wpis nad nią.
+    _navReplace = !(initial && r.kind !== "lib");
+    syncHistory();
+  }
+}
+
+function scheduleSync() {
+  if (!_syncTimer) _syncTimer = setTimeout(() => { _syncTimer = 0; syncHistory(); }, 0);
+}
+
+function navBack() {
+  _popPending = true;
+  clearTimeout(_popTimer);
+  // Gdyby „wstecz” nie miało dokąd pójść (brak popstate) — nie blokujemy historii na zawsze.
+  _popTimer = setTimeout(() => { if (_popPending) { _popPending = false; history.replaceState({}, ""); syncHistory(); } }, 600);
+  history.back();
+}
+
+/** Dopasowuje historię do tego, co widać: nowy wpis, podmiana albo cofnięcie wpisu tymczasowego. */
+function syncHistory() {
+  if (!_navReady || _navBusy || _popPending) return;
+  const scr = document.body.dataset.screen;
+  if (!scr || scr === "screen-auth") return;
+  const st = history.state || {};
+  const modal = !$("#modal-overlay").classList.contains("hidden");
+  const act = ACTIVITY_SCREENS.has(scr);
+  const route = currentRoute();
+  const url = location.pathname + location.search + route;
+  if (_navReplace) {
+    _navReplace = false;
+    if (location.hash !== route || !!st.jlAct !== act || st.jlModal) history.replaceState(act ? { jlAct: 1 } : {}, "", url);
+  } else {
+    if (st.jlModal && !modal) return navBack();
+    if (st.jlAct && !act && !st.jlModal) return navBack();
+    if (location.hash !== route) {
+      if (st.jlModal || (act && st.jlAct)) history.replaceState(st, "", url);
+      else if (act) history.pushState({ jlAct: 1 }, "", url);
+      else if (!st.jlAct && location.hash.startsWith("#/")) history.pushState({}, "", url);
+      else history.replaceState({}, "", url);
+    }
+  }
+  if (modal && !(history.state || {}).jlModal) history.pushState({ jlModal: 1, jlAct: act ? 1 : 0 }, "", url);
+}
+
+window.addEventListener("popstate", () => {
+  if (_popPending) { _popPending = false; clearTimeout(_popTimer); syncHistory(); return; }
+  if (!_navReady || document.body.dataset.screen === "screen-auth") return;
+  const st = history.state || {};
+  const modalOpen = !$("#modal-overlay").classList.contains("hidden");
+  if (modalOpen && !st.jlModal) {
+    _navReplace = true;
+    closeModal(); // jak „Anuluj”
+    if (location.hash === currentRoute()) return;
+  } else if (st.jlModal && !modalOpen) return navBack(); // „dalej” do zamkniętego okna
+  if (parseRoute(location.hash).kind === "gone") {
+    // „Dalej” do zakończonej nauki — nie da się jej odtworzyć.
+    if (ACTIVITY_SCREENS.has(document.body.dataset.screen)) return;
+    return navBack();
+  }
+  if (location.hash === currentRoute()) return;
+  applyRoute(location.hash);
+});
 
 // ════════════════════════════════════════════════════════════════════════════
 //  AUTH
@@ -154,7 +335,8 @@ async function enterApp() {
   state.isAdmin = await DB.isAuthor();
   showScreen("screen-library");
   await seedDefaultFolders();
-  switchTab("mine");
+  _navReady = true;
+  await applyRoute(location.hash, { initial: true });
 }
 
 /** Zapewnia dwa główne katalogi-sekcje: „Fiszki” oraz „Testy ABCD”. */
@@ -390,6 +572,7 @@ function switchTab(tab) {
   else if (tab === "audio") showAudioView(audioView);
   else if (tab === "subjects") showSubject(null);
   else loadPublic();
+  scheduleSync();
 }
 $$('.source-tab[data-tab]').forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
 
@@ -400,6 +583,7 @@ function curFolderId() {
 let _loadMySeq = 0;
 async function loadMy() {
   const seq = ++_loadMySeq; // starsza odpowiedź nie nadpisze nowszego widoku
+  scheduleSync();
   setLibStatus("Wczytuję…");
   try {
     if (state.my._dirty) { state.my.folders = (await DB.listFolders()) || []; state.my._dirty = false; }
@@ -626,6 +810,7 @@ async function loadPublic() {
 }
 
 function renderPublic(allMaterials) {
+  scheduleSync();
   $("#pub-admin-bar").classList.toggle("hidden", !state.isAdmin);
   renderPubSectionTabs();
   const sec = PUB_SECTIONS.find((x) => x.key === state.pub.section) || PUB_SECTIONS[0];
@@ -842,6 +1027,7 @@ function showAudioView(view) {
   $("#audio-mp3").classList.toggle("hidden", view !== "mp3");
   $("#audio-txt").classList.toggle("hidden", view !== "txt");
   if (view === "txt") loadTexts(); else loadAudio();
+  scheduleSync();
 }
 $$(".audio-view").forEach((b) => b.addEventListener("click", () => showAudioView(b.dataset.aview)));
 
@@ -1109,6 +1295,7 @@ function showNeuroView(view) {
   if (view === "cards") renderNeuroDecks();
   else if (view === "fill") renderFillList();
   else renderNeuroList();
+  scheduleSync();
 }
 $$(".neuro-view").forEach((b) => b.addEventListener("click", () => showNeuroView(b.dataset.view)));
 
@@ -1857,6 +2044,8 @@ $("#btn-nb-quit").addEventListener("click", () => { showScreen("screen-library")
 // ════════════════════════════════════════════════════════════════════════════
 const SUBJECTS = { neuro: "Neuro EN", stats: "Statystyka" };
 function showSubject(id) {
+  curSubject = id;
+  scheduleSync();
   $("#subj-home").classList.toggle("hidden", !!id);
   $("#subj-bar").classList.toggle("hidden", !id);
   $("#tab-neuro").classList.toggle("hidden", id !== "neuro");
@@ -1902,6 +2091,7 @@ function showStatsView(view) {
   $("#stats-tasks-view").classList.toggle("hidden", view !== "tasks");
   $("#stats-sense-view").classList.toggle("hidden", view !== "sense");
   if (view === "lab") renderStatsLabs(); else if (view === "sense") renderSenseList(); else renderStatsList();
+  scheduleSync();
 }
 $$(".stats-view").forEach((b) => b.addEventListener("click", () => showStatsView(b.dataset.view)));
 function renderStatsLevel() {
@@ -1925,6 +2115,7 @@ function renderStatsLabs() {
   });
 }
 function openLab(lab) {
+  state.labId = lab.id;
   $("#lab-title").textContent = lab.title;
   const body = $("#lab-body");
   body.innerHTML = "";
@@ -2206,9 +2397,11 @@ function openModal(title, buildBody, { hideClose = false, cls = "" } = {}) {
   buildBody(body);
   $("#modal-close").classList.toggle("hidden", hideClose);
   $("#modal-overlay").classList.remove("hidden");
+  scheduleSync();
 }
 function closeModal() {
   $("#modal-overlay").classList.add("hidden");
+  scheduleSync();
   const d = _modalDismiss;
   _modalDismiss = null;
   if (d) d();
