@@ -10,7 +10,7 @@
 //  + explain[i]: wyjaśnienie dla każdej odpowiedzi (dlaczego dobra / zła),
 //  pokazywane po wyborze.
 // ============================================================================
-import { statsKit, fmt } from "./stats.js?v=32";
+import { statsKit, fmt } from "./stats.js?v=33";
 
 const { ri, pick, shuffle, sum, sorted, median, list, table, histSvg } = statsKit;
 const f2 = (x) => fmt(x, 2), f1 = (x) => fmt(x, 1);

@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
   <link rel="preload" href="assets/fonts/jakarta-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="assets/styles.css?v=32" />
+  <link rel="stylesheet" href="assets/styles.css?v=33" />
 </head>
 <body>
   <svg class="sprite" aria-hidden="true" focusable="false" width="0" height="0">
@@ -239,17 +239,17 @@
         <div id="neuro-boards">
           <p class="nb-intro">Angielskie nazwy struktur mózgu i neuronu. Na planszy wpisz nazwę dla każdego numeru —
             aplikacja sprawdzi odpowiedź (wielkość liter i spacje nie mają znaczenia) i pokaże poprawną.</p>
-          <ul id="neuro-list" class="lib-list"></ul>
+          <ul id="neuro-list" class="lib-list is-even"></ul>
         </div>
         <div id="neuro-fill" class="hidden">
           <p class="nb-intro">Uzupełnianie zdań: wpisz w luki brakujące angielskie słowa (albo klikaj słowa z banku).
             „Sprawdź” pokaże, co jest dobrze, a „Popraw błędne” wyczyści tylko złe luki.</p>
-          <ul id="neuro-fill-list" class="lib-list"></ul>
+          <ul id="neuro-fill-list" class="lib-list is-even"></ul>
         </div>
         <div id="neuro-cards" class="hidden">
           <p class="nb-intro">Fiszki ze słówkami: angielski z przodu, polski z tyłu. W opcjach przed startem
             zaznacz „Odwróć strony”, żeby ćwiczyć z polskiego na angielski.</p>
-          <ul id="neuro-decks" class="lib-list"></ul>
+          <ul id="neuro-decks" class="lib-list is-even"></ul>
         </div>
       </div>
 
@@ -262,7 +262,7 @@
         <div id="stats-lab-view">
           <p class="nb-intro">Zacznij tutaj: każde pojęcie z wykładu można „pomacać” — przesuwasz suwaki, przeciągasz punkty,
             powtarzasz badanie i od razu widzisz, co się zmienia. Na końcu każdego laboratorium są krótkie wyzwania.</p>
-          <ul id="stats-labs" class="lib-list"></ul>
+          <ul id="stats-labs" class="lib-list is-even"></ul>
         </div>
         <div id="stats-tasks-view" class="hidden">
           <div class="st-level">
@@ -274,13 +274,13 @@
             </div>
           </div>
           <p id="st-level-desc" class="nb-intro"></p>
-          <ul id="stats-list" class="lib-list"></ul>
+          <ul id="stats-list" class="lib-list is-even"></ul>
         </div>
         <div id="stats-sense-view" class="hidden">
           <p class="nb-intro">Czy ten wynik jest w ogóle realny? Dostajesz dane i wynik „z raportu” — czasem dobry, często absurdalny.
             Oceń go szybko, bez liczenia wszystkiego od zera, i wybierz właściwe uzasadnienie. Po odpowiedzi zobaczysz,
             dlaczego Twój wybór jest dobry albo zły. Po 3 ćwiczenia na każde zagadnienie z zajęć, liczby losowane za każdym razem.</p>
-          <ul id="stats-sense" class="lib-list"></ul>
+          <ul id="stats-sense" class="lib-list is-even"></ul>
         </div>
       </div>
       </div>
@@ -613,6 +613,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=32"></script>
+  <script type="module" src="assets/app.js?v=33"></script>
 </body>
 </html>
