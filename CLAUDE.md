@@ -113,7 +113,7 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **33**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **34**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
 2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js`, `neuro.js`, `stats.js`, `stats-lab.js`, `stats-sense.js` i `sesja.js` oraz `APP_VERSION`; `stats-sense.js` — `?v=N` w imporcie `stats.js`,
@@ -132,6 +132,16 @@ wszędzie ten sam numer. Bez tego użytkownicy (zwłaszcza PWA) dostaną stary k
   trybu, edycja/zapis materiału, brak błędów w konsoli.
 - Zmiany w `supabase/schema.sql` nie aplikują się same — trzeba je wkleić w Supabase
   SQL Editor (pisz je idempotentnie: `if not exists`, `drop policy if exists`).
+
+## Historia przeglądarki (wstecz/dalej)
+
+Sekcja „HISTORIA PRZEGLĄDARKI” w `app.js` (zaraz po `showScreen`). `currentRoute()` liczy hash z bieżącego
+stanu, `parseRoute`/`applyLibRoute` odtwarzają widok przez te same funkcje co kliknięcia. Funkcje zmieniające
+widok wołają `scheduleSync()` (showScreen, switchTab, loadMy, renderPublic, showAudioView, showSubject,
+showNeuroView, showStatsView, openModal/closeModal) — nowy widok biblioteki = nowy wpis historii.
+Nauka/edytor (`ACTIVITY_SCREENS`, stan `jlAct`) i okna (`jlModal`) to wpisy tymczasowe: wyjście przyciskiem
+w aplikacji robi `history.back()`, nauka→nauka podmienia wpis. Nowy przełącznik widoku w bibliotece = dopisz go
+do `currentRoute`/`parseRoute`/`applyLibRoute` i wywołaj `scheduleSync()`.
 
 ## Konwencje
 

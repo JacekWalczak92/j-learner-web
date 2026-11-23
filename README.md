@@ -21,6 +21,11 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   „Od autora” ma dwie podzakładki: **Materiały** i **Testy i Egzaminy z poprzednich lat**;
   admin wybiera zakładkę w edytorze (pole „Zakładka w »Od autora«”) i może przenosić materiał
   edycją. Egzaminy rozpoznaje znacznik `egzaminy` w kolumnie `tags`.
+- **Strzałki wstecz/dalej przeglądarki** (i gest „wstecz” na telefonie) przechodzą między
+  zakładkami, folderami, sekcjami i modułami (np. Statystyka → Laboratorium / Zadania / Ćwiczenia),
+  zamykają okna i wychodzą z nauki do listy, z której ją zaczęto. Widok jest w adresie
+  (`#/moje/testy/<folder>`, `#/od-autora/egzaminy`, `#/przedmioty/statystyka/cwiczenia`,
+  `#/material/<id>`, `#/lab/<id>`), więc odświeżenie i link wracają w to samo miejsce.
 - **Tryby nauki** (jak w aplikacji mobilnej) — wybierane przy starcie materiału:
   - testy ABCD: **Quiz klasyczny** (ABCD → wpisywanie z pamięci, powtarza aż opanujesz),
     **Sesja testowa** (ABCD, wynik na końcu, powtórka błędnych), **Fiszki**
