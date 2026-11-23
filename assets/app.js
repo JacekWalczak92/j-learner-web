@@ -8,15 +8,15 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=32";
-import { JLDB as DB } from "./supabase.js?v=32";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=32";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=32";
-import { STAT_LABS } from "./stats-lab.js?v=32";
-import { SENSE_TOPICS, SENSE_MIX_SIZE, senseMixGens, senseGenById } from "./stats-sense.js?v=32";
-import { SESJA, sesjaTerms, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=32";
+import { JLParsers as JLP } from "./parsers.js?v=33";
+import { JLDB as DB } from "./supabase.js?v=33";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=33";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=33";
+import { STAT_LABS } from "./stats-lab.js?v=33";
+import { SENSE_TOPICS, SENSE_MIX_SIZE, senseMixGens, senseGenById } from "./stats-sense.js?v=33";
+import { SESJA, sesjaTerms, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=33";
 
-const APP_VERSION = "32";
+const APP_VERSION = "33";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
