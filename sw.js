@@ -14,7 +14,7 @@
 //  UWAGA przy wydaniu nowej wersji: podbij VERSION razem z ?v= w index.html.
 // ============================================================================
 
-const VERSION = "31";
+const VERSION = "32";
 const CACHE_NAME = "jl-shell-v" + VERSION;
 
 const SHELL = [
@@ -28,6 +28,7 @@ const SHELL = [
   "./assets/neuro.js?v=" + VERSION,
   "./assets/stats.js?v=" + VERSION,
   "./assets/stats-lab.js?v=" + VERSION,
+  "./assets/stats-sense.js?v=" + VERSION,
   "./assets/sesja.js?v=" + VERSION,
   "./assets/config.js?v=" + VERSION,
   "./assets/fonts/jakarta-latin.woff2",

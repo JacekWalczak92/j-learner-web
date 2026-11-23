@@ -2625,3 +2625,13 @@ body.is-focus .audio-player { display: none; }
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ── Statystyka → Ćwiczenia: wyjaśnienie wybranej i poprawnej odpowiedzi ── */
+.st-expl { margin: 8px 0; padding: 10px 14px; border-radius: 10px; border-left: 4px solid var(--border-strong); background: var(--surface); }
+.st-expl.is-ok { border-left-color: var(--ok); }
+.st-expl.is-bad { border-left-color: var(--bad); }
+.st-expl p { margin: 4px 0; line-height: 1.5; }
+.st-expl-h { font-weight: 800; font-size: 0.92rem; color: var(--muted); }
+.st-expl.is-ok .st-expl-h { color: var(--ok); }
+.st-expl.is-bad .st-expl-h { color: var(--bad); }
+.st-ans-q { font-weight: 700; }

@@ -8,14 +8,15 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=31";
-import { JLDB as DB } from "./supabase.js?v=31";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=31";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=31";
-import { STAT_LABS } from "./stats-lab.js?v=31";
-import { SESJA, sesjaTerms, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=31";
+import { JLParsers as JLP } from "./parsers.js?v=32";
+import { JLDB as DB } from "./supabase.js?v=32";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=32";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=32";
+import { STAT_LABS } from "./stats-lab.js?v=32";
+import { SENSE_TOPICS, SENSE_MIX_SIZE, senseMixGens, senseGenById } from "./stats-sense.js?v=32";
+import { SESJA, sesjaTerms, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=32";
 
-const APP_VERSION = "31";
+const APP_VERSION = "32";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -1899,7 +1900,8 @@ function showStatsView(view) {
   $$(".stats-view").forEach((b) => b.classList.toggle("is-active", b.dataset.view === view));
   $("#stats-lab-view").classList.toggle("hidden", view !== "lab");
   $("#stats-tasks-view").classList.toggle("hidden", view !== "tasks");
-  if (view === "lab") renderStatsLabs(); else renderStatsList();
+  $("#stats-sense-view").classList.toggle("hidden", view !== "sense");
+  if (view === "lab") renderStatsLabs(); else if (view === "sense") renderSenseList(); else renderStatsList();
 }
 $$(".stats-view").forEach((b) => b.addEventListener("click", () => showStatsView(b.dataset.view)));
 function renderStatsLevel() {
@@ -1955,14 +1957,42 @@ function renderStatsList() {
   }));
 }
 
-function startStats(id, title, gens) {
+// ── Ćwiczenia (stats-sense.js): „czy ten wynik jest w ogóle realny?” ─────────
+// Ten sam silnik co Zadania, ale bez poziomów (zawsze podpowiedź na życzenie).
+function renderSenseList() {
+  const ul = $("#stats-sense");
+  ul.innerHTML = "";
+  const best = readLocal(STATS_BEST_KEY);
+  const rec = (id) => (best[id + ":2"] ? ` · najlepiej ${best[id + ":2"].ok}/${best[id + ":2"].total} za 1. razem` : "");
+  const add = (o) => { const li = document.createElement("li"); li.appendChild(libCard(o)); ul.appendChild(li); };
+  const opt = { lv: 2, plain: true };
+  const missed = Object.keys(readLocal(STATS_MISTAKES_KEY)).map(senseGenById).filter(Boolean);
+  if (missed.length) {
+    add({ kind: "folder", icon: ico("refresh"), name: "Powtórka błędów",
+      sub: `${missed.length} ${plural(missed.length, "ćwiczenie", "ćwiczenia", "ćwiczeń")} z błędem — z nowymi liczbami`,
+      onOpen: () => startStats("c-review", "Powtórka błędów", missed, opt) });
+  }
+  add({ kind: "folder", icon: ico("star"), name: "Sprawdzian mieszany",
+    sub: `${SENSE_MIX_SIZE} losowych ćwiczeń ze wszystkich zagadnień` + rec("c-mix"),
+    onOpen: () => startStats("c-mix", "Sprawdzian mieszany", senseMixGens(), { ...opt, regen: senseMixGens }) });
+  SENSE_TOPICS.forEach((t) => add({
+    kind: "file", icon: escapeHtml(t.icon), name: t.title,
+    sub: `${t.sub} · ${t.gens.length} ${plural(t.gens.length, "ćwiczenie", "ćwiczenia", "ćwiczeń")}` + rec(t.id),
+    onOpen: () => startStats(t.id, t.title, t.gens, opt),
+  }));
+}
+
+/** opt: lv — poziom (domyślnie wybrany w Zadaniach), plain — tytuł bez poziomu, regen — nowe generatory dla „Jeszcze raz”. */
+function startStats(id, title, gens, opt = {}) {
   const used = new Set(); // pytania z banku już zadane w tej sesji
+  const lv = opt.lv || statsLevel;
   state.stats = {
-    id, title, gens, used, total: gens.length, done: 0, firstOk: 0, missed: new Map(),
+    id, title, gens, used, lv, regen: opt.regen || (id === "exam" ? examGens : null), opt,
+    total: gens.length, done: 0, firstOk: 0, missed: new Map(),
     queue: gens.map((gen) => ({ gen, inst: gen.make(used), tries: 0 })),
     phase: "answer", sel: null, hinted: false,
   };
-  $("#st-title").textContent = title + " · " + STAT_LEVELS[statsLevel].name;
+  $("#st-title").textContent = title + (opt.plain ? "" : " · " + STAT_LEVELS[lv].name);
   showScreen("screen-stats");
   showStatsTask();
 }
@@ -2017,11 +2047,11 @@ function showStatsTask() {
   $("#st-card").classList.toggle("choices-first", !!(t.fields && t.choices));
   // Start: podpowiedź widać od razu (nie odbiera punktu); Ekspert: bez podpowiedzi.
   $("#st-hint").innerHTML = `💡 ${t.hint}`;
-  $("#st-hint").classList.toggle("hidden", statsLevel !== 1);
+  $("#st-hint").classList.toggle("hidden", s.lv !== 1);
   $("#st-fb").classList.add("hidden");
   $("#btn-st-hint").disabled = false;
   ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check"].forEach((sel) => $(sel).classList.remove("hidden"));
-  $("#btn-st-hint").classList.toggle("hidden", statsLevel !== 2);
+  $("#btn-st-hint").classList.toggle("hidden", s.lv !== 2);
   $("#btn-st-check").classList.toggle("hidden", !t.fields);
   $("#btn-st-next").classList.add("hidden");
   window.scrollTo({ top: 0 });
@@ -2082,12 +2112,24 @@ function checkStats(giveUp = false) {
     s.queue.splice(pos, 0, { gen: item.gen, inst: item.gen.make(s.used), tries: item.tries + 1 });
   }
 
+  // Ćwiczenia: wyjaśnienie wybranej odpowiedzi (dlaczego dobra / zła) + poprawnej.
+  let expl = "";
+  if (t.explain && t.choices) {
+    const quote = (i) => `<span class="st-ans-q">„${t.choices[i]}”</span>`;
+    if (s.sel != null && !giveUp) {
+      expl += `<div class="st-expl ${s.sel === t.correct ? "is-ok" : "is-bad"}"><p class="st-expl-h">${s.sel === t.correct ? "Dlaczego to dobra odpowiedź" : "Dlaczego Twoja odpowiedź jest zła"}</p>` +
+        `<p>${quote(s.sel)}</p><p>${t.explain[s.sel]}</p></div>`;
+    }
+    if (s.sel !== t.correct || giveUp) {
+      expl += `<div class="st-expl is-ok"><p class="st-expl-h">Poprawna odpowiedź</p><p>${quote(t.correct)}</p><p>${t.explain[t.correct]}</p></div>`;
+    }
+  }
   const fb = $("#st-fb");
   fb.className = "st-fb " + (allOk ? "is-ok" : "is-bad");
   fb.innerHTML = allOk
-    ? `<p class="st-verdict">✓ Dobrze!${s.hinted ? " (z podpowiedzią)" : ""}</p><details class="st-details"><summary>Pokaż rozwiązanie</summary><div class="st-why">${t.why}</div></details>`
+    ? `<p class="st-verdict">✓ Dobrze!${s.hinted ? " (z podpowiedzią)" : ""}</p>${expl}<details class="st-details"><summary>Pokaż rozwiązanie</summary><div class="st-why">${t.why}</div></details>`
     : `<p class="st-verdict">${giveUp ? "Rozwiązanie" : "✗ Nie tym razem"} — to zadanie wróci z nowymi liczbami.</p>` +
-      notes.map((n) => `<p class="st-note">💡 ${n}</p>`).join("") + `<div class="st-why">${t.why}</div>`;
+      notes.map((n) => `<p class="st-note">💡 ${n}</p>`).join("") + expl + `<div class="st-why">${t.why}</div>`;
   ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check"].forEach((sel) => $(sel).classList.add("hidden"));
   $("#st-hint").classList.add("hidden");
   $("#btn-st-next").classList.remove("hidden");
@@ -2115,8 +2157,8 @@ function finishStats() {
   $("#st-card").classList.add("hidden");
   ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check", "#btn-st-next"].forEach((sel) => $(sel).classList.add("hidden"));
   $("#st-kind").textContent = "";
-  if (s.id !== "review") {
-    const best = readLocal(STATS_BEST_KEY), key = s.id + ":" + statsLevel;
+  if (!s.id.endsWith("review")) {
+    const best = readLocal(STATS_BEST_KEY), key = s.id + ":" + s.lv;
     if (!best[key] || best[key].ok < s.firstOk) { best[key] = { ok: s.firstOk, total: s.total }; writeLocal(STATS_BEST_KEY, best); }
   }
   const end = $("#st-end");
@@ -2127,7 +2169,7 @@ function finishStats() {
     `<p>Za pierwszym razem: <b>${s.firstOk} / ${s.total}</b></p>` +
     (missed.length ? `<p class="st-end-miss">Warto powtórzyć: ${missed.map(escapeHtml).join(", ")}</p>` : "") +
     `<div class="session-controls st-end-actions"><button id="btn-st-again" class="btn btn-primary" type="button">Jeszcze raz (nowe liczby)</button></div>`;
-  $("#btn-st-again").addEventListener("click", () => startStats(s.id, s.title, s.id === "exam" ? examGens() : s.gens));
+  $("#btn-st-again").addEventListener("click", () => startStats(s.id, s.title, s.regen ? s.regen() : s.gens, s.opt));
 }
 
 $("#btn-st-check").addEventListener("click", () => checkStats());
@@ -2141,7 +2183,7 @@ $("#btn-st-hint").addEventListener("click", () => {
   $("#st-hint").classList.remove("hidden");
   $("#btn-st-hint").disabled = true;
 });
-$("#btn-st-quit").addEventListener("click", () => { showScreen("screen-library"); renderStatsList(); });
+$("#btn-st-quit").addEventListener("click", () => { showScreen("screen-library"); showStatsView(statsView); });
 document.addEventListener("keydown", (e) => {
   if ($(".screen.is-active")?.id !== "screen-stats" || !state.stats || e.target.closest("input, textarea, select")) return;
   const s = state.stats;

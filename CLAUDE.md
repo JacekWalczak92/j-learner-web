@@ -40,6 +40,7 @@ Edge Function `publish-material`).
 | `assets/neuro.js` | Eksportuje `NEURO_BOARDS` (plansze „Neuro EN": własne SVG, elementy `{ n, en[], pl, x, y, lx, ly }`), `boardSvgMarkup`, `gradeAnswer` (EN lub PL przez `plAnswers`). UI w `app.js` (sekcja NEURO EN): tryby `type` / `match` / `trans`; najlepsze wyniki w localStorage `jl_neuro_best` (klucze `id`, `id:match`, `id:trans`); błędy do „Powtórki błędów” w `jl_neuro_mistakes` (`boardId:n`). Fiszki: `neuroVocabDecks()` (plansze + `GENERAL_TERMS`) → `openNeuroDeck` tworzy `state.material` z `id: null` i używa zwykłego `renderReady`. Zdania z lukami: `FILL_SETS` (luka `{a|b}`, `{@grupa:a}` = dowolna kolejność w grupie), `parseFillSentence`, `gradeFillBlanks`; ekran `screen-fill`. |
 | `assets/stats.js` | „Statystyka": `STAT_TOPICS` (tematy → listy generatorów), `examGens()`, `parseNum`, `numClose`, `fmt`. Generator = `{ id, topic, title, make(used) }`; `make` losuje dane i zwraca `{ q, fig?, fields?: [{ label, ans, d, traps? }], choices?, correct?, hint, why }` (`d` = miejsca po przecinku: 0 dokładnie, inaczej ±1 na ostatnim; `traps` = typowe błędy → podpowiedź). Pytania pojęciowe: `bankGen`. UI w `app.js` (sekcja STATYSTYKA, ekran `screen-stats`): dobrze rozwiązane znikają, błędne wracają z nowymi liczbami; localStorage `jl_stats_best`, `jl_stats_mistakes`. |
 | `assets/stats-lab.js` | „Statystyka → Laboratorium": `STAT_LABS` = `{ id, title, sub, icon, mount(host) }`; `mount` buduje interaktywny DOM/SVG (suwaki, przeciąganie, symulacje) + wyzwania (`challenges`). Ekran `screen-lab`. Poziom zadań (`STAT_LEVELS`, `setStatsLevel`) w `stats.js`, zapis w localStorage `jl_stats_level`; najlepsze wyniki per poziom (`id:poziom`). |
+| `assets/stats-sense.js` | „Statystyka → Ćwiczenia” (prezentacja „Statystyka 2”): `SENSE_TOPICS` (19 zagadnień × 3 generatory), `senseMixGens`, `senseGenById`. Generator jak w `stats.js`, ale tylko wybór + `explain[i]` (wyjaśnienie każdej odpowiedzi, pokazywane po wyborze). `judge()` = „czy wynik z raportu jest realny?” (ok → „Tak” + fałszywe powody; !ok → prawdziwy powód + „Tak” + fałszywe). Pomocniki z `stats.js` przez `statsKit`. Silnik `startStats(id, title, gens, { lv: 2, plain, regen })` w `app.js`; błędy w tym samym `jl_stats_mistakes`. |
 | `assets/sesja.js` | „Terminy sesji” (menu konta → okno, `openTermsModal` w `app.js`): obiekt `SESJA` (daty sesji, przedmioty, terminy `{ what, date?, time?, form?, session?, tbd?, task? }`), `daysUntil`. Okno = prosta tabela, jeden wiersz na przedmiot (`sesjaRows`: z datą → „w sesji” → „brak” → minione; zadania pominięte) — Jacek chciał prosto, bez osi czasu i zakładek. Nowy semestr = podmień `SESJA`. Na telefonie okno jest arkuszem od dołu (`.modal-terms`). |
 | `assets/config.js` | `JL_CONFIG` = `{ supabaseUrl, supabaseAnonKey }`. |
 | `assets/styles.css` | Cały wygląd. Od v29 na końcu blok „szata Żywa” — tokeny kolorów (ciemny domyślnie, jasny w `prefers-color-scheme: light`), wypukłe przyciski (`--press`, `--brand-press`), pasek zakładek na dole (≤760 px), tryb skupienia (`body.is-focus`). Kolory tylko przez tokeny. Uwaga: CSP zabrania atrybutu `style="…"` w HTML — dynamiczne wartości ustawiaj przez `el.style.setProperty`. |
@@ -112,10 +113,10 @@ Fiszki — jedna na linię: `przód;tył[;tagi[;notatka]]`.
 ## Wydanie nowej wersji — WAŻNE
 
 Cache-busting przez `?v=N` + wersja cache service workera. Przy każdej zmianie
-frontendu podbij numer (obecnie **31**) we wszystkich miejscach naraz:
+frontendu podbij numer (obecnie **32**) we wszystkich miejscach naraz:
 
 1. `index.html` — `?v=N` przy `styles.css` i `assets/app.js`,
-2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js`, `neuro.js`, `stats.js`, `stats-lab.js` i `sesja.js` oraz `APP_VERSION`,
+2. `assets/app.js` — `?v=N` w importach `parsers.js`, `supabase.js`, `neuro.js`, `stats.js`, `stats-lab.js`, `stats-sense.js` i `sesja.js` oraz `APP_VERSION`; `stats-sense.js` — `?v=N` w imporcie `stats.js`,
 3. `assets/supabase.js` — `?v=N` w imporcie `config.js`,
 4. `sw.js` — stała `VERSION`.
 
