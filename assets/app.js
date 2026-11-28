@@ -8,15 +8,17 @@ if (window.self !== window.top) {
   try { window.top.location = window.self.location.href; } catch (_) { document.documentElement.style.display = "none"; }
 }
 
-import { JLParsers as JLP } from "./parsers.js?v=34";
-import { JLDB as DB } from "./supabase.js?v=34";
-import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=34";
-import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=34";
-import { STAT_LABS } from "./stats-lab.js?v=34";
-import { SENSE_TOPICS, SENSE_MIX_SIZE, senseMixGens, senseGenById } from "./stats-sense.js?v=34";
-import { SESJA, sesjaTerms, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=34";
+import { JLParsers as JLP } from "./parsers.js?v=35";
+import { JLDB as DB } from "./supabase.js?v=35";
+import { NEURO_BOARDS, boardById, boardSvgMarkup, gradeAnswer, normalizeAnswer, plAnswers, neuroVocabDecks, FILL_SETS, parseFillSentence, gradeFillBlanks } from "./neuro.js?v=35";
+import { STAT_TOPICS, STAT_EXAM_SIZE, STAT_LEVELS, setStatsLevel, examGens, genById, parseNum, numClose, fmt } from "./stats.js?v=35";
+import { STAT_LABS } from "./stats-lab.js?v=35";
+import { SENSE_TOPICS, SENSE_MIX_SIZE, senseMixGens, senseGenById } from "./stats-sense.js?v=35";
+import { PERCEP_DECKS, PERCEP_FILL, PERCEP_TOPICS, PERCEP_LABS, PERCEP_MIX_SIZE, percepMixGens, percepGenById } from "./percep.js?v=35";
+import { SESJA, sesjaTerms, daysUntil, fmtDate as sesDate, dateParts, relDays } from "./sesja.js?v=35";
 
-const APP_VERSION = "34";
+const ALL_LABS = [...STAT_LABS, ...PERCEP_LABS]; // laboratoria Statystyki + eksperymenty z psychologii (trasa #/lab/<id>)
+const APP_VERSION = "35";
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 
 const $ = (s) => document.querySelector(s);
@@ -129,8 +131,9 @@ const ACTIVITY_SCREENS = new Set(["screen-editor", "screen-ready", "screen-test"
   "screen-neuro", "screen-fill", "screen-stats", "screen-lab"]);
 const NEURO_SLUGS = { boards: "plansze", cards: "fiszki", fill: "zdania" };
 const STATS_SLUGS = { lab: "laboratorium", tasks: "zadania", sense: "cwiczenia" };
+const PERCEP_SLUGS = { cards: "fiszki", tasks: "cwiczenia", fill: "zdania", lab: "eksperymenty" };
 const slugKey = (map, slug) => Object.keys(map).find((k) => map[k] === slug) || null;
-let curSubject = null;   // otwarty moduł w „Przedmiotach” (neuro | stats | null)
+let curSubject = null;   // otwarty moduł w „Przedmiotach” (psych | neuro | percep | stats | null)
 let _navReady = false;   // historia działa dopiero po wejściu do aplikacji
 let _navBusy = false;    // trwa odtwarzanie widoku z historii (np. pobieranie materiału)
 let _navReplace = false; // następna synchronizacja tylko podmienia bieżący wpis
@@ -149,7 +152,9 @@ function currentRoute() {
   if (tab === "public") return "#/od-autora" + (state.pub.section === "exams" ? "/egzaminy" : "");
   if (tab === "audio") return "#/audio" + (audioView === "txt" ? "/txt" : "");
   if (tab === "subjects") {
-    if (curSubject === "neuro") return "#/przedmioty/neuro/" + NEURO_SLUGS[neuroView];
+    if (curSubject === "psych") return "#/przedmioty/psychologia";
+    if (curSubject === "neuro") return "#/przedmioty/psychologia/zajecia-1/" + NEURO_SLUGS[neuroView];
+    if (curSubject === "percep") return "#/przedmioty/psychologia/zajecia-2/" + PERCEP_SLUGS[percepView];
     if (curSubject === "stats") return "#/przedmioty/statystyka/" + STATS_SLUGS[statsView];
     return "#/przedmioty";
   }
@@ -169,7 +174,13 @@ function parseRoute(hash) {
     case "od-autora": return { kind: "lib", tab: "public", section: p[1] === "egzaminy" ? "exams" : "main" };
     case "audio": return { kind: "lib", tab: "audio", view: p[1] === "txt" ? "txt" : "mp3" };
     case "przedmioty":
+      // Stary adres Neuro EN (przed przeniesieniem do „Intro to psychology”) nadal działa.
       if (p[1] === "neuro") return { kind: "lib", tab: "subjects", subj: "neuro", view: slugKey(NEURO_SLUGS, p[2]) || "boards" };
+      if (p[1] === "psychologia") {
+        if (p[2] === "zajecia-1") return { kind: "lib", tab: "subjects", subj: "neuro", view: slugKey(NEURO_SLUGS, p[3]) || "boards" };
+        if (p[2] === "zajecia-2") return { kind: "lib", tab: "subjects", subj: "percep", view: slugKey(PERCEP_SLUGS, p[3]) || "cards" };
+        return { kind: "lib", tab: "subjects", subj: "psych" };
+      }
       if (p[1] === "statystyka") return { kind: "lib", tab: "subjects", subj: "stats", view: slugKey(STATS_SLUGS, p[2]) || "lab" };
       return { kind: "lib", tab: "subjects" };
     default:
@@ -199,6 +210,8 @@ function applyLibRoute(r) {
   } else {
     switchTab("subjects");
     if (r.subj === "neuro") { neuroView = r.view; showSubject("neuro"); }
+    else if (r.subj === "percep") { percepView = r.view; showSubject("percep"); }
+    else if (r.subj === "psych") showSubject("psych");
     else if (r.subj === "stats") { statsView = r.view; showSubject("stats"); }
   }
 }
@@ -230,7 +243,7 @@ async function applyRoute(hash, { initial = false } = {}) {
       if (initial || ACTIVITY_SCREENS.has(scr)) applyLibRoute({ kind: "lib", tab: "mine" });
       if (initial) { _navBusy = false; _navReplace = true; syncHistory(); _navBusy = true; }
       if (r.kind === "material") await openMaterial(r.id);
-      else if (r.kind === "lab" && STAT_LABS.some((l) => l.id === r.id)) openLab(STAT_LABS.find((l) => l.id === r.id));
+      else if (r.kind === "lab" && ALL_LABS.some((l) => l.id === r.id)) openLab(ALL_LABS.find((l) => l.id === r.id));
     }
   } finally {
     _navBusy = false;
@@ -1324,11 +1337,15 @@ function openNeuroDeck(deck) {
 }
 
 // ── Uzupełnianie zdań ────────────────────────────────────────────────────────
+/** Listy zdań z lukami: Neuro EN (Zajęcia 1) i Sensation & perception (Zajęcia 2). */
 function renderFillList() {
-  const ul = $("#neuro-fill-list");
+  renderFillSets($("#neuro-fill-list"), FILL_SETS);
+  renderFillSets($("#percep-fill-list"), PERCEP_FILL);
+}
+function renderFillSets(ul, sets) {
   ul.innerHTML = "";
   const best = neuroBest();
-  FILL_SETS.forEach((set) => {
+  sets.forEach((set) => {
     const count = set.sentences.reduce((n, t, i) => n + parseFillSentence(t, i).filter((p) => typeof p !== "string").length, 0);
     const rec = best["fill:" + set.id];
     const li = document.createElement("li");
@@ -2042,20 +2059,98 @@ $("#btn-nb-quit").addEventListener("click", () => { showScreen("screen-library")
 // ════════════════════════════════════════════════════════════════════════════
 //  PRZEDMIOTY — wybór modułu (Neuro EN, Statystyka); po wejściu w zakładkę zawsze lista modułów
 // ════════════════════════════════════════════════════════════════════════════
-const SUBJECTS = { neuro: "Neuro EN", stats: "Statystyka" };
+// „Intro to psychology” (psych) ma sekcje zajęć: Zajęcia 1 = Neuro EN, Zajęcia 2 = Sensation & perception.
+const SUBJECTS = {
+  psych: "Intro to psychology", stats: "Statystyka",
+  neuro: "Zajęcia 1: Neuro EN", percep: "Zajęcia 2: Sensation & perception",
+};
+const SUBJ_PARENT = { neuro: "psych", percep: "psych" };
 function showSubject(id) {
   curSubject = id;
   scheduleSync();
   $("#subj-home").classList.toggle("hidden", !!id);
   $("#subj-bar").classList.toggle("hidden", !id);
+  $("#psych-home").classList.toggle("hidden", id !== "psych");
   $("#tab-neuro").classList.toggle("hidden", id !== "neuro");
+  $("#tab-percep").classList.toggle("hidden", id !== "percep");
   $("#tab-stats").classList.toggle("hidden", id !== "stats");
   $("#subj-title").textContent = id ? SUBJECTS[id] : "";
+  $("#btn-subj-back").textContent = SUBJ_PARENT[id] ? "← " + SUBJECTS[SUBJ_PARENT[id]] : "← Przedmioty";
   if (id === "neuro") showNeuroView(neuroView);
+  else if (id === "percep") showPercepView(percepView);
   else if (id === "stats") showStatsView(statsView);
 }
 $$(".subj-card").forEach((c) => c.addEventListener("click", () => showSubject(c.dataset.subj)));
-$("#btn-subj-back").addEventListener("click", () => showSubject(null));
+$("#btn-subj-back").addEventListener("click", () => showSubject(SUBJ_PARENT[curSubject] || null));
+
+// ── Zajęcia 2: Sensation & perception (percep.js) ────────────────────────────
+let percepView = "cards";
+function showPercepView(view) {
+  percepView = view;
+  $$(".percep-view").forEach((b) => b.classList.toggle("is-active", b.dataset.view === view));
+  for (const v of Object.keys(PERCEP_SLUGS)) $("#percep-" + v).classList.toggle("hidden", v !== view);
+  if (view === "cards") renderPercepDecks();
+  else if (view === "tasks") renderPercepTasks();
+  else if (view === "fill") renderFillList();
+  else renderPercepLabs();
+  scheduleSync();
+}
+$$(".percep-view").forEach((b) => b.addEventListener("click", () => showPercepView(b.dataset.view)));
+
+function renderPercepDecks() {
+  const ul = $("#percep-decks");
+  ul.innerHTML = "";
+  PERCEP_DECKS.forEach((d) => {
+    const li = document.createElement("li");
+    li.appendChild(libCard({
+      kind: "cards", icon: ico("cards"), name: d.title,
+      sub: `${d.sub} · ${d.cards.length} ${plural(d.cards.length, "fiszka", "fiszki", "fiszek")}`,
+      onOpen: () => {
+        state.material = {
+          id: null, type: "flashcards", name: "Sensation & perception · " + d.title,
+          items: d.cards.map((c) => ({ front: c.front, back: c.back, explanation: c.note })),
+        };
+        renderReady();
+        showScreen("screen-ready");
+      },
+    }));
+    ul.appendChild(li);
+  });
+}
+
+// Ćwiczenia na silniku zadań statystyki (startStats): wybór + wyjaśnienie każdej odpowiedzi.
+function renderPercepTasks() {
+  const ul = $("#percep-list");
+  ul.innerHTML = "";
+  const best = readLocal(STATS_BEST_KEY);
+  const rec = (id) => (best[id + ":2"] ? ` · najlepiej ${best[id + ":2"].ok}/${best[id + ":2"].total} za 1. razem` : "");
+  const add = (o) => { const li = document.createElement("li"); li.appendChild(libCard(o)); ul.appendChild(li); };
+  const opt = { lv: 2, plain: true, againLabel: "Jeszcze raz (inne pytania)", retryNote: "za chwilę dostaniesz podobne pytanie." };
+  const missed = Object.keys(readLocal(STATS_MISTAKES_KEY)).map(percepGenById).filter(Boolean);
+  if (missed.length) {
+    add({ kind: "folder", icon: ico("refresh"), name: "Powtórka błędów",
+      sub: `${missed.length} ${plural(missed.length, "rodzaj", "rodzaje", "rodzajów")} ćwiczeń z błędem — z innymi pytaniami`,
+      onOpen: () => startStats("p-review", "Powtórka błędów", missed, opt) });
+  }
+  add({ kind: "folder", icon: ico("star"), name: "Sprawdzian mieszany",
+    sub: `${PERCEP_MIX_SIZE} ćwiczeń ze wszystkich zagadnień` + rec("p-mix"),
+    onOpen: () => startStats("p-mix", "Sprawdzian mieszany", percepMixGens(), { ...opt, regen: percepMixGens }) });
+  PERCEP_TOPICS.forEach((t) => add({
+    kind: "file", icon: escapeHtml(t.icon), name: t.title,
+    sub: `${t.sub} · ${t.gens.length} ${plural(t.gens.length, "ćwiczenie", "ćwiczenia", "ćwiczeń")}` + rec(t.id),
+    onOpen: () => startStats(t.id, t.title, t.gens, opt),
+  }));
+}
+
+function renderPercepLabs() {
+  const ul = $("#percep-labs");
+  ul.innerHTML = "";
+  PERCEP_LABS.forEach((l) => {
+    const li = document.createElement("li");
+    li.appendChild(libCard({ kind: "file", icon: escapeHtml(l.icon), name: l.title, sub: l.sub, onOpen: () => openLab(l) }));
+    ul.appendChild(li);
+  });
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  STATYSTYKA — zadania z losowanymi danymi (stats.js); dobrze rozwiązane znikają
@@ -2319,7 +2414,7 @@ function checkStats(giveUp = false) {
   fb.className = "st-fb " + (allOk ? "is-ok" : "is-bad");
   fb.innerHTML = allOk
     ? `<p class="st-verdict">✓ Dobrze!${s.hinted ? " (z podpowiedzią)" : ""}</p>${expl}<details class="st-details"><summary>Pokaż rozwiązanie</summary><div class="st-why">${t.why}</div></details>`
-    : `<p class="st-verdict">${giveUp ? "Rozwiązanie" : "✗ Nie tym razem"} — to zadanie wróci z nowymi liczbami.</p>` +
+    : `<p class="st-verdict">${giveUp ? "Rozwiązanie" : "✗ Nie tym razem"} — ${s.opt.retryNote || "to zadanie wróci z nowymi liczbami."}</p>` +
       notes.map((n) => `<p class="st-note">💡 ${n}</p>`).join("") + expl + `<div class="st-why">${t.why}</div>`;
   ["#btn-st-hint", "#btn-st-giveup", "#btn-st-check"].forEach((sel) => $(sel).classList.add("hidden"));
   $("#st-hint").classList.add("hidden");
@@ -2359,7 +2454,7 @@ function finishStats() {
     `<p class="st-end-big">${s.firstOk === s.total ? "Komplet! 🎉" : "Wszystkie zadania rozwiązane"}</p>` +
     `<p>Za pierwszym razem: <b>${s.firstOk} / ${s.total}</b></p>` +
     (missed.length ? `<p class="st-end-miss">Warto powtórzyć: ${missed.map(escapeHtml).join(", ")}</p>` : "") +
-    `<div class="session-controls st-end-actions"><button id="btn-st-again" class="btn btn-primary" type="button">Jeszcze raz (nowe liczby)</button></div>`;
+    `<div class="session-controls st-end-actions"><button id="btn-st-again" class="btn btn-primary" type="button">${s.opt.againLabel || "Jeszcze raz (nowe liczby)"}</button></div>`;
   $("#btn-st-again").addEventListener("click", () => startStats(s.id, s.title, s.regen ? s.regen() : s.gens, s.opt));
 }
 
@@ -2374,7 +2469,10 @@ $("#btn-st-hint").addEventListener("click", () => {
   $("#st-hint").classList.remove("hidden");
   $("#btn-st-hint").disabled = true;
 });
-$("#btn-st-quit").addEventListener("click", () => { showScreen("screen-library"); showStatsView(statsView); });
+$("#btn-st-quit").addEventListener("click", () => {
+  showScreen("screen-library");
+  if (curSubject === "percep") showPercepView(percepView); else showStatsView(statsView);
+});
 document.addEventListener("keydown", (e) => {
   if ($(".screen.is-active")?.id !== "screen-stats" || !state.stats || e.target.closest("input, textarea, select")) return;
   const s = state.stats;

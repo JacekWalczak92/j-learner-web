@@ -14,7 +14,7 @@
 //  UWAGA przy wydaniu nowej wersji: podbij VERSION razem z ?v= w index.html.
 // ============================================================================
 
-const VERSION = "34";
+const VERSION = "35";
 const CACHE_NAME = "jl-shell-v" + VERSION;
 
 const SHELL = [
@@ -29,6 +29,7 @@ const SHELL = [
   "./assets/stats.js?v=" + VERSION,
   "./assets/stats-lab.js?v=" + VERSION,
   "./assets/stats-sense.js?v=" + VERSION,
+  "./assets/percep.js?v=" + VERSION,
   "./assets/sesja.js?v=" + VERSION,
   "./assets/config.js?v=" + VERSION,
   "./assets/fonts/jakarta-latin.woff2",

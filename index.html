@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
   <link rel="preload" href="assets/fonts/jakarta-latin.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="assets/styles.css?v=34" />
+  <link rel="stylesheet" href="assets/styles.css?v=35" />
 </head>
 <body>
   <svg class="sprite" aria-hidden="true" focusable="false" width="0" height="0">
@@ -215,9 +215,9 @@
         <div id="subj-home">
           <p class="nb-intro">Wybierz moduł do nauki.</p>
           <div class="subj-grid">
-            <button class="subj-card" type="button" data-subj="neuro">
-              <span class="subj-ico"><svg class="ico" aria-hidden="true"><use href="#i-brain"/></svg></span><span class="subj-name">Neuro EN</span>
-              <span class="subj-sub">Angielskie nazwy struktur mózgu i neuronu: plansze, fiszki, zdania z lukami</span>
+            <button class="subj-card" type="button" data-subj="psych">
+              <span class="subj-ico"><svg class="ico" aria-hidden="true"><use href="#i-brain"/></svg></span><span class="subj-name">Intro to psychology</span>
+              <span class="subj-sub">Zajęcia 1: układ nerwowy (Neuro EN) · Zajęcia 2: sensation &amp; perception</span>
             </button>
             <button class="subj-card" type="button" data-subj="stats">
               <span class="subj-ico"><svg class="ico" aria-hidden="true"><use href="#i-chart"/></svg></span><span class="subj-name">Statystyka</span>
@@ -228,6 +228,19 @@
         <div id="subj-bar" class="subj-bar hidden">
           <button id="btn-subj-back" class="btn btn-ghost btn-sm" type="button">← Przedmioty</button>
           <span id="subj-title" class="subj-title"></span>
+        </div>
+        <div id="psych-home" class="hidden">
+          <p class="nb-intro">Intro to psychology — materiały z kolejnych zajęć (po angielsku, jak na ćwiczeniach).</p>
+          <div class="subj-grid">
+            <button class="subj-card" type="button" data-subj="neuro">
+              <span class="subj-ico"><svg class="ico" aria-hidden="true"><use href="#i-brain"/></svg></span><span class="subj-name">Zajęcia 1 · Neuro EN</span>
+              <span class="subj-sub">The nervous system: angielskie nazwy struktur mózgu i neuronu — plansze, fiszki, zdania z lukami</span>
+            </button>
+            <button class="subj-card" type="button" data-subj="percep">
+              <span class="subj-ico"><svg class="ico" aria-hidden="true"><use href="#i-target"/></svg></span><span class="subj-name">Zajęcia 2 · Sensation &amp; perception</span>
+              <span class="subj-sub">Progi, adaptacja, zmysły, Gestalt, top-down, uwaga i złudzenia — fiszki, ćwiczenia z wyjaśnieniami, eksperymenty</span>
+            </button>
+          </div>
         </div>
 
       <div id="tab-neuro" class="hidden">
@@ -250,6 +263,33 @@
           <p class="nb-intro">Fiszki ze słówkami: angielski z przodu, polski z tyłu. W opcjach przed startem
             zaznacz „Odwróć strony”, żeby ćwiczyć z polskiego na angielski.</p>
           <ul id="neuro-decks" class="lib-list is-even"></ul>
+        </div>
+      </div>
+
+      <div id="tab-percep" class="hidden">
+        <div class="nb-modes nb-modes-4" role="tablist" aria-label="Sensation &amp; perception">
+          <button class="nb-mode percep-view is-active" role="tab" type="button" data-view="cards"><svg class="ico" aria-hidden="true"><use href="#i-cards"/></svg>Fiszki</button>
+          <button class="nb-mode percep-view" role="tab" type="button" data-view="tasks"><svg class="ico" aria-hidden="true"><use href="#i-target"/></svg>Ćwiczenia</button>
+          <button class="nb-mode percep-view" role="tab" type="button" data-view="fill"><svg class="ico" aria-hidden="true"><use href="#i-sentence"/></svg>Zdania</button>
+          <button class="nb-mode percep-view" role="tab" type="button" data-view="lab"><svg class="ico" aria-hidden="true"><use href="#i-flask"/></svg>Lab</button>
+        </div>
+        <div id="percep-cards">
+          <p class="nb-intro">Fiszki z drugich zajęć: pojęcie po angielsku z przodu, definicja z tyłu (w notatce polski odpowiednik).
+            W opcjach przed startem zaznacz „Odwróć strony”, żeby z definicji zgadywać pojęcie.</p>
+          <ul id="percep-decks" class="lib-list is-even"></ul>
+        </div>
+        <div id="percep-tasks" class="hidden">
+          <p class="nb-intro">Sytuacje, rysunki i odpowiedzi z arkusza do oceny. Po każdej odpowiedzi zobaczysz, dlaczego jest dobra albo zła;
+            błędne zadania wracają w innej wersji. Treść po angielsku, jak na ćwiczeniach.</p>
+          <ul id="percep-list" class="lib-list is-even"></ul>
+        </div>
+        <div id="percep-fill" class="hidden">
+          <p class="nb-intro">Uzupełnianie zdań: definicje ze słowniczka i najważniejsze myśli z arkusza. Wpisz słowo albo kliknij je w banku.</p>
+          <ul id="percep-fill-list" class="lib-list is-even"></ul>
+        </div>
+        <div id="percep-lab" class="hidden">
+          <p class="nb-intro">Sprawdź pojęcia na sobie: zmierz swój próg różnicy, zobacz adaptację w powidoku i daj się oszukać złudzeniu Müller-Lyera.</p>
+          <ul id="percep-labs" class="lib-list is-even"></ul>
         </div>
       </div>
 
@@ -292,7 +332,7 @@
     <section id="screen-lab" class="screen">
       <div class="nb-head"><h1 id="lab-title" class="nb-title"></h1></div>
       <div id="lab-body" class="lab-body"></div>
-      <div class="session-controls"><button id="btn-lab-quit" class="btn btn-link" type="button">Wróć do laboratorium</button></div>
+      <div class="session-controls"><button id="btn-lab-quit" class="btn btn-link" type="button">Wróć do listy</button></div>
     </section>
 
     <!-- ───────────────────────── STATYSTYKA: ZADANIA ───────────────────────── -->
@@ -613,6 +653,6 @@
     </div>
   </div>
 
-  <script type="module" src="assets/app.js?v=34"></script>
+  <script type="module" src="assets/app.js?v=35"></script>
 </body>
 </html>

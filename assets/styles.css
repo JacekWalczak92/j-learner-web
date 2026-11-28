@@ -2640,3 +2640,18 @@ body.is-focus .audio-player { display: none; }
 .st-expl.is-ok .st-expl-h { color: var(--ok); }
 .st-expl.is-bad .st-expl-h { color: var(--bad); }
 .st-ans-q { font-weight: 700; }
+
+/* ── Intro to psychology · Zajęcia 2 (percep.js): rysunki Gestalt i eksperymenty ── */
+.subj-card[data-subj="percep"] .subj-ico { background: var(--amber-soft); color: var(--amber-600, var(--amber)); }
+.pc-svg { max-width: 340px; margin-block: 4px; }
+.pc-dot { fill: var(--indigo); }
+.pc-dot.pc-alt { fill: var(--teal); }
+.pc-line { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.pc-line-2 { stroke: var(--indigo); }
+.pc-ink { fill: var(--ink); }
+.pc-paper { fill: var(--surface); }
+.pc-jnd { max-width: 420px; }
+.pc-jnd .pc-patch { cursor: pointer; }
+.pc-after { max-width: 420px; }
+.pc-ml { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; }
+@media (max-width: 520px) { .nb-modes-4 .nb-mode .ico { display: none; } }
