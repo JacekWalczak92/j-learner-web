@@ -61,8 +61,17 @@ statyczny (idealny pod GitHub Pages), a konta i dane trzyma **Supabase** (darmow
   jak słuchać ich w ElevenReaderze. Przy każdym pliku: podgląd, Udostępnij (na telefonie —
   prosto do ElevenReadera), Kopiuj tekst, Pobierz .txt, Usuń. Treść leży w tabeli
   `text_files` (sekcja TEKSTY w `supabase/schema.sql`), teksty autora widzą wszyscy zalogowani.
-- **Przedmioty** — zakładka z modułami do nauki; po wejściu wybierasz moduł (Neuro EN, Statystyka).
-- **Neuro EN** — nauka angielskich nazw struktur mózgu i neuronu (np. dla psychologów).
+- **Przedmioty** — zakładka z przedmiotami: **Intro to psychology** (sekcje zajęć) i **Statystyka**.
+  Intro to psychology → **Zajęcia 1: Neuro EN** (niżej) i **Zajęcia 2: Sensation & perception**
+  (materiał z drugich ćwiczeń, po angielsku):
+  - **Fiszki** — słowniczek 12 pojęć (progi, adaptacja, zmysły), pojęcia z arkusza (top-down, uwaga,
+    McGurk, neuropatia bólowa) i zasady Gestalt; z tyłu definicja, w notatce polski odpowiednik,
+  - **Ćwiczenia** — 8 zagadnień (definicja ↔ pojęcie, który zmysł, próg czy adaptacja, wrażenie czy
+    spostrzeżenie, Gestalt na rysunkach i w logo, top-down, uwaga i złudzenia, „sprawdź odpowiedź z arkusza”);
+    po każdej odpowiedzi wyjaśnienie, dlaczego jest dobra albo zła; sprawdzian mieszany i powtórka błędów,
+  - **Zdania** — definicje i najważniejsze myśli z arkusza do uzupełnienia,
+  - **Lab** — eksperymenty: własny próg różnicy (metoda schodkowa), powidok (adaptacja), złudzenie Müller-Lyera.
+- **Neuro EN** (Intro to psychology → Zajęcia 1) — nauka angielskich nazw struktur mózgu i neuronu (np. dla psychologów).
   Plansze (własne rysunki SVG): mózg — widok boczny, mózg — przekrój pośrodkowy
   (z hipokampem, korą, pniem i rdzeniem), neuron, synapsa, typy neuronów (kształt i funkcja)
   oraz podziały układu nerwowego (CNS/PNS, somatyczny/autonomiczny, współczulny/
@@ -219,6 +228,7 @@ j-learner-web/
 │   ├── stats.js        # zadania „Statystyka" (generatory z losowanymi danymi)
 │   ├── stats-lab.js    # „Statystyka → Laboratorium" (interaktywne wizualizacje)
 │   ├── stats-sense.js  # „Statystyka → Ćwiczenia" (czy wynik jest realny? + wyjaśnienia)
+│   ├── percep.js       # „Intro to psychology → Zajęcia 2: Sensation & perception"
 │   ├── styles.css      # wygląd
 │   └── app.js          # logika UI i sesji
 ├── supabase/
